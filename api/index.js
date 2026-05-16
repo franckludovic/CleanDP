@@ -30,16 +30,11 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const isVercel = process.env.VERCEL === '1';
-const UPLOADS_DIR = isVercel ? path.join('/tmp', 'uploads') : path.join(__dirname, 'uploads');
-if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-
-app.use(express.static(path.join(__dirname, '../public')));
-app.use('/uploads', express.static(UPLOADS_DIR));
+app.use(express.static(path.join(__dirname, '../')));
 
 // Local parity with vercel.json rewrites
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, '../public/population.html')));
-app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, '../public/admin.html')));
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, '../population.html')));
+app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, '../admin.html')));
 
 // --- Multer Setup (Memory Storage for direct upload to Supabase) ---
 const storage = multer.memoryStorage();
