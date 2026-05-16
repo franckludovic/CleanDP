@@ -27,7 +27,7 @@
     --radius-sm:      6px;
     --radius-md:      10px;
     --radius-lg:      16px;
-    --sidebar-w:      391px;
+    --sidebar-w:      340px;
     --transition:     0.18s cubic-bezier(0.4,0,0.2,1);
 }
 
@@ -56,25 +56,15 @@ body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-size:14px; 
 /* ── Header ── */
 .admin-header {
     background: linear-gradient(135deg, #1a56db 0%, #1339a8 100%);
-    padding: 18px 18px 14px;
+    padding: 14px 14px 10px;
     flex-shrink: 0;
 }
 .admin-header-top {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
 }
-.logo_cud4 { height:36px; width:auto; border-radius:6px; flex-shrink:0; }
-.admin-header-text { flex:1; min-width:0; }
-.admin-brand {
-    display: block;
-    font-size: 1rem;
-    font-weight: 700;
-    color: #fff;
-    letter-spacing: -0.02em;
-    line-height: 1.2;
-}
+.logo_cud4 { width: 44px; height: 44px; object-fit: contain; }
+.admin-header-text { display: flex; flex-direction: column; color: #fff; }
+.admin-brand { font-size: 1.15rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; }
 .admin-subtitle { display:block; font-size:0.72rem; color:rgba(255,255,255,0.65); margin-top:1px; }
 
 /* Pulsing green status dot */
@@ -128,13 +118,14 @@ body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-size:14px; 
 }
 .admin-tab {
     flex: 1;
-    padding: 11px 6px;
+    background: transparent;
     border: none;
-    background: none;
-    color: var(--text-muted);
-    font-family: inherit;
-    font-size: 0.78rem;
+    padding: 10px 4px;
+    font-size: 0.68rem;
     font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -271,23 +262,23 @@ body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-size:14px; 
 .alerts-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.78rem;
+    font-size: 0.72rem;
 }
 .alerts-table thead tr {
     background: var(--surface-2);
 }
 .alerts-table th {
     text-align: left;
-    padding: 7px 8px;
+    padding: 6px;
     font-weight: 700;
-    font-size: 0.68rem;
+    font-size: 0.65rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--text-muted);
     border-bottom: 1px solid var(--border);
 }
 .alerts-table td {
-    padding: 8px 8px;
+    padding: 6px;
     border-bottom: 1px solid var(--border);
     vertical-align: middle;
     color: var(--text-primary);
@@ -301,10 +292,10 @@ body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-size:14px; 
 }
 .row-new { animation: rowSlideIn 0.3s ease-out; }
 
-.tbl-zone { font-weight: 600; font-size: 0.8rem; white-space: nowrap; }
-.tbl-contact { font-size: 0.72rem; color: var(--text-secondary); line-height: 1.6; }
-.tbl-contact i { color: var(--primary); font-size: 0.65rem; margin-right:2px; }
-.tbl-date  { font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; }
+.tbl-zone { font-weight: 600; font-size: 0.75rem; white-space: normal; line-height: 1.2; display: block; margin-bottom: 2px; }
+.tbl-contact { font-size: 0.68rem; color: var(--text-secondary); line-height: 1.5; }
+.tbl-contact i { color: var(--primary); font-size: 0.6rem; margin-right:2px; }
+.tbl-date  { font-size: 0.68rem; color: var(--text-muted); white-space: nowrap; }
 .tbl-actions { display: flex; gap: 4px; }
 
 .tbl-badge {
@@ -315,7 +306,8 @@ body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-size:14px; 
     font-weight: 600;
     background: var(--surface-2);
     color: var(--text-secondary);
-    white-space: nowrap;
+    white-space: normal;
+    line-height: 1.2;
 }
 .tbl-badge--danger  { background: var(--danger-light); color: var(--danger); }
 .tbl-badge--success { background: var(--success-light); color: var(--success); }
@@ -340,8 +332,7 @@ body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-size:14px; 
 .stats-rail {
     position: absolute;
     right: 14px;
-    top: 50%;
-    transform: translateY(-50%);
+    top: 20px;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
@@ -414,7 +405,7 @@ body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-size:14px; 
 .stats-pill--green:hover { border-color: var(--success); }
 
 /* Tabs with 4 items — shrink font slightly */
-.admin-tabs .admin-tab { font-size: 0.72rem; }
+.admin-tabs .admin-tab { font-size: 0.68rem; }
 
 /* ════════════════════════════
    REPORT CARDS
@@ -608,6 +599,56 @@ body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-size:14px; 
 }
 
 /* ════════════════════════════
+   CHART WIDGET
+════════════════════════════ */
+.chart-widget {
+    width: 280px;
+    height: 180px;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    margin-top: 4px;
+}
+.chart-widget h3 {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin: 0;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+.chart-delta {
+    font-size: 0.7rem;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+.chart-delta.up { color: var(--success); }
+.chart-delta.down { color: var(--danger); }
+.chart-widget h3 i { color: var(--success); font-size: 0.75rem; }
+.chart-container-inner {
+    flex: 1;
+    position: relative;
+    width: 100%;
+}
+
+/* ════════════════════════════
    PHOTO MODAL
 ════════════════════════════ */
 .photo-modal {
@@ -636,6 +677,23 @@ body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-size:14px; 
 /* ════════════════════════════
    PHOTO UPLOAD & SUBMIT (Population)
 ════════════════════════════ */
+
+.pop-sidebar { width: 330px; }
+.pop-sidebar .admin-header-top { padding: 10px 14px; }
+.pop-sidebar .admin-brand { font-size: 1.05rem; }
+.pop-sidebar .admin-subtitle { font-size: 0.7rem; }
+.pop-sidebar .admin-content { padding: 12px; }
+.pop-sidebar .section-intro { padding: 8px 10px; font-size: 0.72rem; margin-bottom: 12px; }
+.pop-sidebar .form-group { margin-bottom: 10px !important; }
+.pop-sidebar .field-label { font-size: 0.72rem; margin-bottom: 4px; }
+.pop-sidebar .form-control { padding: 6px 10px 6px 32px; font-size: 0.75rem; }
+.pop-sidebar .input-icon-wrap { height: 32px; }
+.pop-sidebar .input-icon { padding: 6px 10px; font-size: 0.75rem; }
+.pop-sidebar .btn-primary { padding: 8px; font-size: 0.8rem; }
+.pop-sidebar .admin-tab { padding: 8px 4px; font-size: 0.7rem; }
+.pop-sidebar .report-item { padding: 8px 10px; font-size: 0.75rem; margin-bottom: 8px; }
+.pop-sidebar .report-actions button { padding: 4px 8px !important; font-size: 0.7rem !important; }
+.pop-sidebar .section-divider span { font-size: 0.65rem; }
 
 .photo-upload-label {
     display:flex; align-items:center; gap:10px; width:100%; padding:11px 14px;

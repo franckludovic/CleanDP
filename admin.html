@@ -131,6 +131,23 @@
                 <div class="stats-pill stats-pill--green" id="pill-resolved" data-label="Résolus aujourd'hui">
                     <i class="fas fa-check-circle"></i><span>0</span>
                 </div>
+                <div class="stats-pill stats-pill--blue" id="pill-total" data-label="Total Alertes Reçues">
+                    <i class="fas fa-chart-line"></i><span>0</span>
+                </div>
+                <div class="stats-pill stats-pill--teal" id="pill-quarters" data-label="Quartiers Couverts">
+                    <i class="fas fa-map-signs"></i><span>0</span>
+                </div>
+                
+                <!-- Resolution Chart Widget -->
+                <div class="chart-widget">
+                    <div class="chart-header">
+                        <h3><i class="fas fa-chart-area"></i> Résolutions</h3>
+                        <div id="chartDelta" class="chart-delta"></div>
+                    </div>
+                    <div class="chart-container-inner">
+                        <canvas id="resolutionChart"></canvas>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -144,6 +161,7 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="animation.js"></script>
     <script>
         const API_BASE = 'http://localhost:3000/api';
@@ -154,6 +172,7 @@
         let markers = {};
         let riskZones = []; // Array of L.circle for risk zones
         let tempMarker = null;
+        let resolutionChartInstance = null;
 
         // --- Tab Navigation ---
         function switchTab(tab) {
@@ -171,7 +190,7 @@
             startAnimationLoop(map, async (id) => {
                 await loadReports();
             });
-            setInterval(pollReports, 8000);
+            setInterval(pollReports, 5000);
         };
 
         function initMap() {
@@ -317,42 +336,36 @@
                     const noMsg = list.querySelector('.no-reports-msg');
                     if (noMsg) noMsg.remove();
 
-                    // Ensure table wrapper exists
-                    let tbl = list.querySelector('.alerts-table');
-                    if (!tbl) {
-                        tbl = document.createElement('table');
-                        tbl.className = 'alerts-table';
-                        tbl.innerHTML = `<thead><tr>
-                            <th>Zone</th><th>Type</th><th>Contact</th><th>Date</th><th></th>
-                        </tr></thead><tbody id="alertsTableBody"></tbody>`;
-                        list.appendChild(tbl);
-                    }
-
+                    // We don't need a table wrapper anymore, just append directly to 'list'
                     activeSidebar.forEach(r => {
                         // If card already exists and unchanged, skip
                         if (knownReportIds.has(r.id) && document.getElementById(`report-card-${r.id}`)) return;
                         knownReportIds.add(r.id);
 
-                        const tbody = document.getElementById('alertsTableBody');
-                        const tr = document.createElement('tr');
-                        tr.id = `report-card-${r.id}`;
-                        tr.setAttribute('data-status', r.status);
-                        tr.className = isFirstLoad ? '' : 'row-new';
-                        tr.innerHTML = `
-                            <td><span class="tbl-zone">🚨 ${r.quartier}</span></td>
-                            <td><span class="tbl-badge">${r.type}</span></td>
-                            <td class="tbl-contact"><i class="fas fa-user"></i> ${r.nom}<br><i class="fas fa-phone"></i> ${r.telephone}</td>
-                            <td class="tbl-date">${r.date.split(' ')[0] || r.date}</td>
-                            <td class="tbl-actions">
-                                <button onclick="viewZone(${r.id})" class="tbl-btn tbl-btn--view" title="Voir sur carte">
-                                    <i class="fas fa-map-marker-alt"></i>
+                        const card = document.createElement('div');
+                        card.id = `report-card-${r.id}`;
+                        card.setAttribute('data-status', r.status);
+                        card.className = 'report-item' + (isFirstLoad ? '' : ' report-item-new');
+                        card.innerHTML = `
+                            <div class="report-header">
+                                <span>🚨 ${r.quartier}</span>
+                                <small>${(r.date || '').split(' ')[0]}</small>
+                            </div>
+                            <div class="report-type">${r.type}</div>
+                            <div class="report-identity">
+                                <i class="fas fa-user"></i> ${r.nom} &nbsp;&nbsp; 
+                                <i class="fas fa-phone"></i> ${r.telephone}
+                            </div>
+                            <div class="report-actions">
+                                <button onclick="viewZone(${r.id})" class="btn-view-zone" title="Voir sur carte">
+                                    <i class="fas fa-map-marker-alt"></i> Localiser
                                 </button>
-                                <button onclick="resolveReport(${r.id})" class="tbl-btn tbl-btn--resolve" title="Marquer résolu">
-                                    <i class="fas fa-check"></i>
+                                <button onclick="resolveReport(${r.id})" class="btn-resolve" title="Marquer résolu">
+                                    <i class="fas fa-check"></i> Résoudre
                                 </button>
-                            </td>
+                            </div>
                         `;
-                        tbody.prepend(tr);
+                        list.prepend(card);
 
                         // Map marker
                         if (!markers['rep_' + r.id]) {
@@ -391,6 +404,10 @@
             const bins     = fixedPoints ? fixedPoints.length : 0;
             const zones    = riskZones ? riskZones.length : 0;
             const trucks   = Object.keys(animatedTrucks || {}).length;
+            
+            // New stats
+            const totalAlerts = reports.length;
+            const uniqueQuarters = new Set(reports.filter(r => r.status === 'resolved').map(r => r.quartier)).size;
 
             const set = (id, val) => {
                 const el = document.getElementById(id);
@@ -401,6 +418,135 @@
             set('pill-bins',     bins);
             set('pill-zones',    zones);
             set('pill-resolved', resolved);
+            set('pill-total',    totalAlerts);
+            set('pill-quarters', uniqueQuarters);
+
+            updateResolutionChart(reports);
+        }
+
+        // --- Resolution Chart ---
+        function updateResolutionChart(reports) {
+            const resolvedReports = reports.filter(r => r.status === 'resolved' && r.date);
+            if (resolvedReports.length === 0) return;
+
+            // Group by week
+            const getWeekYear = (dString) => {
+                let d;
+                if (typeof dString === 'string' && dString.includes('/')) {
+                    const p = dString.split(/[ \/:\-]+/); // e.g. "16/05/2026 10:20" -> ["16", "05", "2026", "10", "20"]
+                    if (p.length >= 3) {
+                        d = new Date(`${p[2]}-${p[1]}-${p[0]}T00:00:00`); // YYYY-MM-DD
+                    } else {
+                        d = new Date(dString);
+                    }
+                } else {
+                    d = new Date(dString);
+                }
+                
+                if (isNaN(d.getTime())) d = new Date(); // fallback
+
+                d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay()||7));
+                const yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+                const weekNo = Math.ceil(( ( (d - yearStart) / 86400000) + 1)/7);
+                return `S${weekNo} ${d.getUTCFullYear()}`;
+            };
+
+            const counts = {};
+            resolvedReports.forEach(r => {
+                const wk = getWeekYear(r.date);
+                counts[wk] = (counts[wk] || 0) + 1;
+            });
+
+            const sortedKeys = Object.keys(counts).sort((a, b) => {
+                const [wa, ya] = a.replace('S','').split(' ').map(Number);
+                const [wb, yb] = b.replace('S','').split(' ').map(Number);
+                if (ya !== yb) return ya - yb;
+                return wa - wb;
+            });
+
+            const labels = sortedKeys;
+            const data = sortedKeys.map(k => counts[k]);
+
+            // Calculate Delta (last vs current week)
+            const deltaEl = document.getElementById('chartDelta');
+            if (deltaEl && data.length >= 2) {
+                const curr = data[data.length - 1];
+                const prev = data[data.length - 2];
+                const diff = curr - prev;
+                let pct = 0;
+                if (prev > 0) pct = Math.round((diff / prev) * 100);
+                else pct = curr > 0 ? 100 : 0;
+
+                const icon = diff >= 0 ? 'fa-arrow-up' : 'fa-arrow-down';
+                const cls = diff >= 0 ? 'up' : 'down';
+                deltaEl.innerHTML = `<i class="fas ${icon}"></i> ${Math.abs(pct)}%`;
+                deltaEl.className = `chart-delta ${cls}`;
+            } else if (deltaEl) {
+                deltaEl.innerHTML = '';
+            }
+
+            const ctx = document.getElementById('resolutionChart').getContext('2d');
+
+            if (resolutionChartInstance) {
+                resolutionChartInstance.data.labels = labels;
+                resolutionChartInstance.data.datasets[0].data = data;
+                resolutionChartInstance.update();
+            } else {
+                const gradient = ctx.createLinearGradient(0, 0, 0, 200);
+                gradient.addColorStop(0, 'rgba(16, 185, 129, 0.4)');
+                gradient.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+
+                resolutionChartInstance = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Résolutions',
+                            data: data,
+                            borderColor: '#10b981',
+                            backgroundColor: gradient,
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            pointBackgroundColor: '#fff',
+                            pointBorderColor: '#10b981',
+                            pointBorderWidth: 2,
+                            pointRadius: 4,
+                            pointHoverRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                                titleFont: { family: 'Inter', size: 13 },
+                                bodyFont: { family: 'Inter', size: 13, weight: 'bold' },
+                                padding: 10,
+                                cornerRadius: 8,
+                                displayColors: false
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: { display: false },
+                                ticks: { font: { family: 'Inter', size: 10 }, color: '#64748b' }
+                            },
+                            y: {
+                                beginAtZero: true,
+                                border: { display: true, color: 'rgba(0,0,0,0.1)' },
+                                grid: { color: 'rgba(0,0,0,0.04)' },
+                                ticks: { font: { family: 'Inter', size: 10 }, color: '#64748b', stepSize: 1 }
+                            }
+                        },
+                        layout: {
+                            padding: { bottom: 5, left: 5, right: 5 }
+                        }
+                    }
+                });
+            }
         }
 
         // --- History Tab ---
@@ -409,7 +555,8 @@
             try {
                 const res = await fetch(`${API_BASE}/reports`);
                 const all = await res.json();
-                const sorted = [...all].sort((a, b) => b.id - a.id);
+                const resolved = all.filter(r => r.status === 'resolved');
+                const sorted = [...resolved].sort((a, b) => b.id - a.id);
                 container.innerHTML = '';
 
                 if (sorted.length === 0) {
@@ -417,31 +564,28 @@
                     return;
                 }
 
-                const tbl = document.createElement('table');
-                tbl.className = 'alerts-table';
-                tbl.innerHTML = `<thead><tr>
-                    <th>Zone</th><th>Type</th><th>Contact</th><th>Date</th><th>Statut</th>
-                </tr></thead>`;
-                const tbody = document.createElement('tbody');
-
                 sorted.forEach(r => {
-                    const tr = document.createElement('tr');
+                    const card = document.createElement('div');
+                    card.className = 'report-item';
                     const isPending  = r.status === 'pending';
-                    const badge      = isPending
-                        ? `<span class="tbl-badge tbl-badge--danger">En attente</span>`
-                        : `<span class="tbl-badge tbl-badge--success">Résolu</span>`;
-                    tr.innerHTML = `
-                        <td><span class="tbl-zone">${isPending ? '🚨' : '✅'} ${r.quartier}</span></td>
-                        <td><span class="tbl-badge">${r.type}</span></td>
-                        <td class="tbl-contact"><i class="fas fa-user"></i> ${r.nom}<br><i class="fas fa-phone"></i> ${r.telephone}</td>
-                        <td class="tbl-date">${(r.date || '').split(' ')[0]}</td>
-                        <td>${badge}</td>
+                    const badge = isPending 
+                        ? `<span class="status-badge" style="background:var(--danger)">En attente</span>`
+                        : `<span class="status-badge">Résolu</span>`;
+                    
+                    card.innerHTML = `
+                        <div class="report-header">
+                            <span>${isPending ? '🚨' : '✅'} ${r.quartier}</span>
+                            ${badge}
+                        </div>
+                        <div class="report-type">${r.type}</div>
+                        <div class="report-identity">
+                            <i class="fas fa-user"></i> ${r.nom} &nbsp;&nbsp; 
+                            <i class="fas fa-phone"></i> ${r.telephone} &nbsp;&nbsp;
+                            <i class="far fa-clock"></i> ${(r.date || '').split(' ')[0]}
+                        </div>
                     `;
-                    tbody.appendChild(tr);
+                    container.appendChild(card);
                 });
-
-                tbl.appendChild(tbody);
-                container.appendChild(tbl);
             } catch(e) {
                 container.innerHTML = '<div class="section-intro" style="color:red;">Erreur de chargement.</div>';
             }

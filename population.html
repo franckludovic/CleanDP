@@ -12,7 +12,7 @@
 <body>
     <div class="admin-layout">
         <!-- Sidebar Citoyen -->
-        <aside class="admin-sidebar" style="width: 380px;">
+        <aside class="admin-sidebar pop-sidebar">
             <!-- Header -->
             <div class="admin-header">
                 <div class="admin-header-top">
@@ -181,6 +181,9 @@
             initSearchableSelect('quartier', 'quartierList', QUARTIERS_LIST, "Quartier non trouvé");
             initSearchableSelect('typeProblem', 'typeProblemList', PROBLEMS, "Problème non trouvé");
             initPhotoUpload();
+            
+            // Auto-refresh data every 5 seconds
+            setInterval(pollData, 5000);
         };
 
         const reportMarkers = {}; // Store static markers
@@ -239,6 +242,14 @@
                     
                     reportMarkers[r.id] = m;
                 });
+
+                // Refresh active tab
+                const activeTabEl = document.querySelector('.admin-tab.active');
+                if (activeTabEl) {
+                    const activeTab = activeTabEl.getAttribute('data-tab');
+                    if (activeTab === 'depots') renderNearbyDepots();
+                    if (activeTab === 'alerts') renderNearbyAlerts();
+                }
 
             } catch (err) {
                 console.warn('Poll error:', err.message);
