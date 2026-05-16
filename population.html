@@ -6,105 +6,165 @@
     <title>Signalement Déchets - Douala</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <!-- Carte Leaflet -->
-        <div id="map"></div>
-
-        <!-- Formulaire Flottant -->
-        <div class="pop-panel">
-            <div class="pop-header">
-                <img src="logo_cud4.png" class="logo_cud4">
-                <h2><i class="fas fa-trash-alt"></i> Signaler un Déchet</h2>
-                <p>Signalez un problème à la CUD (Douala).</p>
-            </div>
-            <form id="reportForm" enctype="multipart/form-data">
-
-                <!-- Identité du citoyen -->
-                <div class="form-section-title">
-                    <i class="fas fa-user-circle"></i> Vos Informations
-                </div>
-
-                <div class="form-group">
-                    <label><i class="fas fa-user"></i> Nom complet</label>
-                    <input type="text" id="nomCitoyen" class="form-control" placeholder="Ex: Jean Dupont" required>
-                </div>
-
-                <div class="form-group">
-                    <label><i class="fas fa-phone"></i> Numéro de téléphone</label>
-                    <input type="tel" id="telephone" class="form-control" placeholder="Ex: 6XX XXX XXX" required>
-                </div>
-
-                <!-- Localisation -->
-                <div class="form-section-title">
-                    <i class="fas fa-map-marker-alt"></i> Localisation
-                </div>
-
-                <button type="button" class="btn-gps" onclick="getLocation()">
-                    <i class="fas fa-crosshairs"></i> Activer ma Position (GPS)
-                </button>
-
-                <div class="form-group">
-                    <label>Vos Coordonnées</label>
-                    <input type="text" id="gpsCoords" class="form-control" placeholder="Cliquez sur Activer GPS..." readonly required>
-                </div>
-
-                <div class="form-group searchable-select">
-                    <label>Quartier</label>
-                    <input type="text" id="quartier" class="form-control" placeholder="Rechercher ou taper un quartier..." required autocomplete="off">
-                    <div id="quartierList" class="dropdown-list"></div>
-                </div>
-
-                <!-- Détails -->
-                <div class="form-section-title">
-                    <i class="fas fa-exclamation-triangle"></i> Détails du problème
-                </div>
-
-                <div class="form-group searchable-select">
-                    <label>Description du problème</label>
-                    <input type="text" id="typeProblem" class="form-control" placeholder="Décrivez le problème..." required autocomplete="off">
-                    <div id="typeProblemList" class="dropdown-list"></div>
-                </div>
-
-                <div class="form-group">
-                    <label><i class="fas fa-camera"></i> Photo (optionnel)</label>
-                    <label for="photoInput" class="photo-upload-label" id="photoLabelContainer">
-                        <i class="fas fa-cloud-upload-alt"></i>
-                        <span id="photoLabel">Cliquez pour ajouter une photo</span>
-                    </label>
-                    <input type="file" id="photoInput" accept="image/*" style="display:none">
-                    
-                    <div id="photoPreview" class="photo-preview" style="display:none">
-                        <img id="previewImg" src="">
-                        <button type="button" class="remove-photo-btn" onclick="removePhoto()">
-                            <i class="fas fa-times"></i>
-                        </button>
+    <div class="admin-layout">
+        <!-- Sidebar Citoyen -->
+        <aside class="admin-sidebar" style="width: 380px;">
+            <!-- Header -->
+            <div class="admin-header">
+                <div class="admin-header-top">
+                    <img src="logo_cud4.png" class="logo_cud4">
+                    <div class="admin-header-text">
+                        <span class="admin-brand">CUD Citoyen</span>
+                        <span class="admin-subtitle">Signalement Propreté</span>
                     </div>
                 </div>
+                <div class="admin-stats-bar">
+                    <div class="stat-chip stat-chip--green">
+                        <i class="fas fa-leaf"></i><span>Douala Propre</span>
+                    </div>
+                </div>
+            </div>
 
-                <!-- Submit -->
-                <div id="submitStatus" class="submit-status" style="display:none"></div>
-
-                <button type="submit" class="btn-submit" id="submitBtn">
-                    <i class="fas fa-paper-plane"></i> Envoyer le signalement
+            <!-- ── Tabs ── -->
+            <div class="admin-tabs">
+                <button class="admin-tab active" data-tab="report" onclick="switchTab('report')">
+                    <i class="fas fa-plus-circle"></i> Signaler
                 </button>
-            </form>
+                <button class="admin-tab" data-tab="depots" onclick="switchTab('depots')">
+                    <i class="fas fa-trash-alt"></i> Bacs Proches
+                </button>
+                <button class="admin-tab" data-tab="alerts" onclick="switchTab('alerts')">
+                    <i class="fas fa-bell"></i> Alertes Proches
+                </button>
+            </div>
+
+            <!-- Scrollable Content -->
+            <div class="admin-content" style="padding: 16px;">
+                
+                <!-- TAB: Signaler -->
+                <div id="tab-report" class="tab-panel active" style="padding: 0;">
+                    <div class="section-intro">
+                        Signalez un dépôt sauvage, un bac plein ou tout autre problème de propreté. <strong>Votre action compte.</strong>
+                    </div>
+
+                <form id="reportForm" class="dispatch-form" enctype="multipart/form-data" style="margin-top: 10px;">
+                    
+                    <div class="section-divider"><span>Vos Informations</span></div>
+
+                    <div class="form-group" style="margin-bottom:12px;">
+                        <label class="field-label"><i class="fas fa-user"></i> Nom complet</label>
+                        <div class="input-icon-wrap">
+                            <i class="fas fa-user input-icon"></i>
+                            <input type="text" id="nomCitoyen" class="form-control form-control--icon" placeholder="Ex: Jean Dupont" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom:16px;">
+                        <label class="field-label"><i class="fas fa-phone"></i> Numéro de téléphone</label>
+                        <div class="input-icon-wrap">
+                            <i class="fas fa-phone input-icon"></i>
+                            <input type="tel" id="telephone" class="form-control form-control--icon" placeholder="Ex: 6XX XXX XXX" required>
+                        </div>
+                    </div>
+
+                    <div class="section-divider"><span>Localisation</span></div>
+
+                    <button type="button" class="btn-primary" onclick="getLocation()" style="margin-bottom:12px; background:var(--text-secondary); box-shadow:none;">
+                        <i class="fas fa-crosshairs"></i> Activer ma Position (GPS)
+                    </button>
+
+                    <div class="form-group" style="margin-bottom:12px;">
+                        <div class="input-icon-wrap">
+                            <i class="fas fa-map-marker-alt input-icon" style="color:var(--danger)"></i>
+                            <input type="text" id="gpsCoords" class="form-control form-control--icon" placeholder="Coordonnées (Requis)" readonly required>
+                        </div>
+                    </div>
+
+                    <div class="form-group searchable-select" style="margin-bottom:16px;">
+                        <label class="field-label">Quartier</label>
+                        <div class="input-icon-wrap">
+                            <i class="fas fa-map input-icon"></i>
+                            <input type="text" id="quartier" class="form-control form-control--icon" placeholder="Rechercher ou taper un quartier..." required autocomplete="off">
+                        </div>
+                        <div id="quartierList" class="dropdown-list"></div>
+                    </div>
+
+                    <div class="section-divider"><span>Détails</span></div>
+
+                    <div class="form-group searchable-select" style="margin-bottom:14px;">
+                        <label class="field-label">Nature du problème</label>
+                        <div class="input-icon-wrap">
+                            <i class="fas fa-exclamation-triangle input-icon" style="color:var(--warning)"></i>
+                            <input type="text" id="typeProblem" class="form-control form-control--icon" placeholder="Décrivez le problème..." required autocomplete="off">
+                        </div>
+                        <div id="typeProblemList" class="dropdown-list"></div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom:18px;">
+                        <label class="field-label"><i class="fas fa-camera"></i> Photo (optionnel)</label>
+                        <label for="photoInput" class="photo-upload-label" id="photoLabelContainer">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <span id="photoLabel">Cliquez pour ajouter une photo</span>
+                        </label>
+                        <input type="file" id="photoInput" accept="image/*" style="display:none">
+                        
+                        <div id="photoPreview" class="photo-preview" style="display:none">
+                            <img id="previewImg" src="">
+                            <button type="button" class="remove-photo-btn" onclick="removePhoto()">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Submit -->
+                    <div id="submitStatus" class="submit-status" style="display:none"></div>
+
+                    <button type="submit" class="btn-primary btn-primary--green" id="submitBtn">
+                        <i class="fas fa-paper-plane"></i> Envoyer le signalement
+                    </button>
+                </form>
+                </div>
+
+                <!-- TAB: Bacs Proches -->
+                <div id="tab-depots" class="tab-panel" style="padding: 0;">
+                    <div class="section-intro">Bacs à ordures triés par proximité. <strong>Activez votre GPS.</strong></div>
+                    <div id="depotsList"><div class="loading-placeholder"><i class="fas fa-location-arrow"></i> En attente du GPS...</div></div>
+                </div>
+
+                <!-- TAB: Alertes Proches -->
+                <div id="tab-alerts" class="tab-panel" style="padding: 0;">
+                    <div class="section-intro">Signalements citoyens à proximité.</div>
+                    <div id="alertsList"><div class="loading-placeholder"><i class="fas fa-location-arrow"></i> En attente du GPS...</div></div>
+                </div>
+
+            </div>
+        </aside>
+
+        <!-- Carte Leaflet -->
+        <div class="map-wrapper">
+            <div id="map"></div>
+            <div class="map-hint"><i class="fas fa-mouse-pointer"></i> Double-cliquez sur un dépôt pour zoomer</div>
         </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="animation.js"></script>
     <script>
         // --- Configuration ---
         const API_BASE = 'http://localhost:3000/api';
         const CUD_COORDS = [4.0483, 9.7043];
         let map;
         let userMarker;
+        let userLatLng = null; // Store user GPS
+        let currentRoute = null; // Store OSRM route polyline
+        let allReports = [];
+        let allFixedPoints = [];
         const markers = [];
 
-        // --- Données ---
-        const QUARTIERS = ["Akwa", "Bonanjo", "Bonapriso", "Deido", "New Bell", "Bassa", "Kotto", "Makepé", "Logbessou"];
         const PROBLEMS = [
             "Tas d'ordures sur le trottoir",
             "Ordures au quartier",
@@ -117,13 +177,13 @@
         window.onload = function() {
             initMap();
             loadInitialData();
-            setInterval(pollData, 10000); // Poll for updates every 10s
-            initSearchableSelect('quartier', 'quartierList', QUARTIERS, "Quartier non trouvé");
+            startAnimationLoop(map);
+            initSearchableSelect('quartier', 'quartierList', QUARTIERS_LIST, "Quartier non trouvé");
             initSearchableSelect('typeProblem', 'typeProblemList', PROBLEMS, "Problème non trouvé");
             initPhotoUpload();
         };
 
-        const reportMarkers = {}; // Store markers by ID for smart updates
+        const reportMarkers = {}; // Store static markers
 
         async function loadInitialData() {
             await pollData();
@@ -138,11 +198,11 @@
 
                 // 2. Poll Reports (The dynamic part)
                 const repRes = await fetch(`${API_BASE}/reports`);
-                const reports = await repRes.json();
-                const pending = reports.filter(r => r.status === 'pending');
+                allReports = await repRes.json();
+                const pending = allReports.filter(r => r.status === 'pending');
                 const pendingIds = new Set(pending.map(r => r.id));
 
-                // Remove resolved or deleted markers
+                // Remove resolved, dispatched, or deleted static markers
                 Object.keys(reportMarkers).forEach(id => {
                     if (!pendingIds.has(Number(id))) {
                         map.removeLayer(reportMarkers[id]);
@@ -150,14 +210,19 @@
                     }
                 });
 
-                // Add only new markers
+                // 3. Poll Schedules and animate
+                const schedRes = await fetch(`${API_BASE}/schedules`);
+                const schedules = await schedRes.json();
+                updateAnimatedTrucks(map, schedules, true);
+
+                // Add only new pending markers
                 pending.forEach(r => {
                     if (reportMarkers[r.id]) return;
 
                     const m = L.marker([r.lat, r.lng], {
                         icon: L.divIcon({
                             className: 'report-marker',
-                            html: '<div class="marker-bubble"><span class="marker-emoji">🗑️</span></div>',
+                            html: '<div class="marker-bubble"><span class="marker-emoji">🚨</span></div>',
                             iconSize: [44, 44],
                             iconAnchor: [22, 44],
                             popupAnchor: [0, -44]
@@ -184,39 +249,22 @@
             try {
                 // Points Fixes
                 const fixedRes = await fetch(`${API_BASE}/fixed-points`);
-                const fixedPoints = await fixedRes.json();
-                fixedPoints.forEach(pt => {
+                allFixedPoints = await fixedRes.json();
+                allFixedPoints.forEach(pt => {
                     const m = L.marker([pt.lat, pt.lng], {
                         icon: L.divIcon({
                             className: 'fixed-marker',
-                            html: '<div class="marker-bubble-small">♻️</div>',
+                            html: '<div class="marker-bubble-small">🗑️</div>',
                             iconSize: [36, 36],
                             iconAnchor: [18, 36]
                         })
-                    }).addTo(map).bindPopup(`<b>Point Fixe:</b> ${pt.name}`);
+                    }).addTo(map).bindPopup(`<b>Point de Dépôt:</b> ${pt.name}`);
                     m.on('dblclick', (e) => {
                         L.DomEvent.stopPropagation(e);
                         if (map.getZoom() < 16) map.flyTo([pt.lat, pt.lng], 16, { animate: true, duration: 1.0 });
                     });
                 });
 
-                // Plannings Hysacam
-                const schedRes = await fetch(`${API_BASE}/schedules`);
-                const schedules = await schedRes.json();
-                schedules.forEach(sch => {
-                    const m = L.marker(CUD_COORDS, {
-                        icon: L.divIcon({
-                            className: 'hysacam-marker',
-                            html: '<div class="marker-bubble-small">🚛</div>',
-                            iconSize: [36, 36],
-                            iconAnchor: [18, 36]
-                        })
-                    }).addTo(map).bindPopup(`<b>Hysacam</b><br>Quartier: ${sch.quartier}<br>Heure: ${sch.time}`);
-                    m.on('dblclick', (e) => {
-                        L.DomEvent.stopPropagation(e);
-                        if (map.getZoom() < 16) map.flyTo(CUD_COORDS, 16, { animate: true, duration: 1.0 });
-                    });
-                });
             } catch(e) {}
         }
 
@@ -240,10 +288,16 @@
                     (position) => {
                         const lat = position.coords.latitude;
                         const lng = position.coords.longitude;
+                        userLatLng = L.latLng(lat, lng);
                         input.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
                         map.setView([lat, lng], 16);
                         if(userMarker) map.removeLayer(userMarker);
                         userMarker = L.marker([lat, lng]).addTo(map).bindPopup("Vous êtes ici").openPopup();
+                        
+                        // Refresh active tab if it's depots or alerts
+                        const activeTab = document.querySelector('.admin-tab.active').getAttribute('data-tab');
+                        if (activeTab === 'depots') renderNearbyDepots();
+                        if (activeTab === 'alerts') renderNearbyAlerts();
                     },
                     () => {
                         alert("Erreur GPS. Veuillez autoriser la localisation.");
@@ -413,6 +467,139 @@
                 submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Envoyer le signalement';
             }
         });
+
+        // --- Tabs Logic ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            
+            document.querySelector(`button[data-tab="${tabId}"]`).classList.add('active');
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+
+            if (tabId === 'depots') {
+                if (!userLatLng) getLocation();
+                else renderNearbyDepots();
+            } else if (tabId === 'alerts') {
+                if (!userLatLng) getLocation();
+                else renderNearbyAlerts();
+            }
+        }
+
+        function getDistance(latlng1, latlng2) {
+            if (!latlng1 || !latlng2) return Infinity;
+            return latlng1.distanceTo(latlng2);
+        }
+
+        // --- Nearby Depots ---
+        function renderNearbyDepots() {
+            const list = document.getElementById('depotsList');
+            if (!userLatLng) {
+                list.innerHTML = '<div class="loading-placeholder"><i class="fas fa-location-arrow"></i> En attente du GPS...</div>';
+                return;
+            }
+            if (allFixedPoints.length === 0) {
+                list.innerHTML = '<div class="loading-placeholder">Aucun point de dépôt connu.</div>';
+                return;
+            }
+
+            const sorted = [...allFixedPoints].map(pt => {
+                const dist = getDistance(userLatLng, L.latLng(pt.lat, pt.lng));
+                return { ...pt, distance: dist };
+            }).sort((a, b) => a.distance - b.distance);
+
+            list.innerHTML = '';
+            sorted.forEach(pt => {
+                const distText = pt.distance < 1000 ? `${Math.round(pt.distance)} m` : `${(pt.distance/1000).toFixed(1)} km`;
+                const div = document.createElement('div');
+                div.className = 'report-item';
+                div.innerHTML = `
+                    <div style="flex:1">
+                        <div class="report-id"><i class="fas fa-trash-alt" style="color:var(--primary)"></i> ${pt.name}</div>
+                        <div class="report-quartier" style="margin-top:4px;"><i class="fas fa-map-marker-alt"></i> À ${distText} de vous</div>
+                    </div>
+                    <div class="report-actions">
+                        <button class="btn-primary" style="padding:6px 12px; font-size:0.75rem;" onclick="drawRouteTo(${pt.lat}, ${pt.lng})">
+                            <i class="fas fa-route"></i> Y aller
+                        </button>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        // --- Nearby Alerts ---
+        function renderNearbyAlerts() {
+            const list = document.getElementById('alertsList');
+            if (!userLatLng) {
+                list.innerHTML = '<div class="loading-placeholder"><i class="fas fa-location-arrow"></i> En attente du GPS...</div>';
+                return;
+            }
+            if (allReports.length === 0) {
+                list.innerHTML = '<div class="loading-placeholder">Aucune alerte récente.</div>';
+                return;
+            }
+
+            const sorted = [...allReports].map(r => {
+                const dist = getDistance(userLatLng, L.latLng(r.lat, r.lng));
+                return { ...r, distance: dist };
+            }).sort((a, b) => a.distance - b.distance);
+
+            list.innerHTML = '';
+            sorted.forEach(r => {
+                const distText = r.distance < 1000 ? `${Math.round(r.distance)} m` : `${(r.distance/1000).toFixed(1)} km`;
+                const isResolved = r.status === 'resolved';
+                const div = document.createElement('div');
+                div.className = 'report-item';
+                div.innerHTML = `
+                    <div style="flex:1">
+                        <div class="report-id">${isResolved ? '✅' : '🚨'} ${r.type}</div>
+                        <div class="report-quartier" style="margin-top:4px;">${r.quartier} — <span style="opacity:0.7">À ${distText}</span></div>
+                    </div>
+                    <div>
+                        <span style="font-size:0.7rem; padding:3px 8px; border-radius:12px; font-weight:600; ${isResolved ? 'background:var(--success-light);color:var(--success)' : 'background:var(--danger-light);color:var(--danger)'}">
+                            ${isResolved ? 'Résolu' : 'En attente'}
+                        </span>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        // --- Routing (OSRM) ---
+        async function drawRouteTo(destLat, destLng) {
+            if (!userLatLng) {
+                alert("GPS requis pour tracer la route.");
+                return;
+            }
+            // Clear existing route
+            if (currentRoute) map.removeLayer(currentRoute);
+
+            // Fetch route from OSRM
+            try {
+                const url = `https://router.project-osrm.org/route/v1/driving/${userLatLng.lng},${userLatLng.lat};${destLng},${destLat}?overview=full&geometries=geojson`;
+                const res = await fetch(url);
+                const data = await res.json();
+
+                if (data.routes && data.routes[0]) {
+                    const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]); // GeoJSON is [lng, lat], Leaflet is [lat, lng]
+                    
+                    currentRoute = L.polyline(coords, {
+                        color: '#10b981',
+                        weight: 6,
+                        opacity: 0.9,
+                        className: 'blinking-route'
+                    }).addTo(map);
+
+                    // Fit map bounds
+                    map.fitBounds(currentRoute.getBounds(), { padding: [50, 50] });
+                } else {
+                    alert("Impossible de tracer une route vers ce point.");
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Erreur de calcul d'itinéraire.");
+            }
+        }
     </script>
 </body>
 </html>

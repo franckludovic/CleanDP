@@ -82,6 +82,19 @@ async function initDb() {
             lng       REAL    NOT NULL
         );
     `);
+    
+    // Add columns if they don't exist
+    try { db.run("ALTER TABLE reports ADD COLUMN dispatch_start TEXT;"); } catch(e){}
+    try { db.run("ALTER TABLE reports ADD COLUMN dispatch_eta INTEGER;"); } catch(e){}
+    try { db.run("ALTER TABLE reports ADD COLUMN return_start TEXT;"); } catch(e){}
+    
+    try { db.run("ALTER TABLE schedules ADD COLUMN lat REAL;"); } catch(e){}
+    try { db.run("ALTER TABLE schedules ADD COLUMN lng REAL;"); } catch(e){}
+    try { db.run("ALTER TABLE schedules ADD COLUMN dispatch_start TEXT;"); } catch(e){}
+    try { db.run("ALTER TABLE schedules ADD COLUMN return_start TEXT;"); } catch(e){}
+    try { db.run("ALTER TABLE schedules ADD COLUMN status TEXT DEFAULT 'dispatched';"); } catch(e){}
+    try { db.run("ALTER TABLE fixed_points ADD COLUMN created_at TEXT;"); } catch(e){}
+
     saveDb();
 }
 
@@ -164,11 +177,26 @@ app.get('/api/schedules', (req, res) => {
 
 app.post('/api/schedules', (req, res) => {
     try {
-        const { quartier, time } = req.body;
-        if (!quartier || !time) return res.status(400).json({ error: 'Quartier et heure requis.' });
-        dbRun('INSERT INTO schedules (quartier, time) VALUES (?,?)', [quartier, time]);
+        const { quartier, time, lat, lng } = req.body;
+        if (!quartier || !time || !lat || !lng) return res.status(400).json({ error: 'Quartier, heure, lat et lng requis.' });
+        dbRun('INSERT INTO schedules (quartier, time, lat, lng, dispatch_start, status) VALUES (?,?,?,?,?,?)', 
+            [quartier, time, parseFloat(lat), parseFloat(lng), new Date().toISOString(), 'dispatched']);
         const id = lastInsertId();
-        res.status(201).json({ id, quartier, time });
+        res.status(201).json({ id, quartier, time, lat: parseFloat(lat), lng: parseFloat(lng), status: 'dispatched' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/schedules/:id/resolve', (req, res) => {
+    try {
+        dbRun('UPDATE schedules SET status=?, return_start=? WHERE id=?', ['returning', new Date().toISOString(), parseInt(req.params.id)]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/schedules/:id/finish', (req, res) => {
+    try {
+        dbRun('DELETE FROM schedules WHERE id=?', [parseInt(req.params.id)]);
+        res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -191,9 +219,10 @@ app.post('/api/fixed-points', (req, res) => {
         const { name, lat, lng } = req.body;
         if (!name || lat === undefined || lng === undefined)
             return res.status(400).json({ error: 'Nom, lat, lng requis.' });
-        dbRun('INSERT INTO fixed_points (name, lat, lng) VALUES (?,?,?)', [name, parseFloat(lat), parseFloat(lng)]);
+        const now = new Date().toISOString();
+        dbRun('INSERT INTO fixed_points (name, lat, lng, created_at) VALUES (?,?,?,?)', [name, parseFloat(lat), parseFloat(lng), now]);
         const id = lastInsertId();
-        res.status(201).json({ id, name, lat: parseFloat(lat), lng: parseFloat(lng) });
+        res.status(201).json({ id, name, lat: parseFloat(lat), lng: parseFloat(lng), created_at: now });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

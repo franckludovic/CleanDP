@@ -6,53 +6,133 @@
     <title>Administration CUD - Douala</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="admin-layout">
         <!-- Sidebar de gestion -->
         <aside class="admin-sidebar">
-            <div class="admin-header">
-                <img src="logo_cud4.png" class="logo_cud4">
-                <h2><i class="fas fa-city"></i> CUD Admin</h2>
-                <small id="reportCount" style="color:#adf; font-size:0.8rem;"></small>
-            </div>
-            <div class="admin-content">
 
-                <!-- Section Signalements -->
-                <div class="admin-section">
-                    <h3><i class="fas fa-bell"></i> Signalements en attente</h3>
-                    <div id="reportsList">
-                        <p style="color:#777; font-size:0.8rem;">Chargement...</p>
+            <!-- ── Header ── -->
+            <div class="admin-header">
+                <div class="admin-header-top">
+                    <img src="logo_cud4.png" class="logo_cud4">
+                    <div class="admin-header-text">
+                        <span class="admin-brand">CUD Admin</span>
+                        <span class="admin-subtitle">Centre de Contrôle</span>
+                    </div>
+                    <div class="admin-status-dot" title="Système actif"></div>
+                </div>
+                <div class="admin-stats-bar">
+                    <div class="stat-chip" id="reportCount">
+                        <i class="fas fa-bell"></i><span>0 signalement(s)</span>
+                    </div>
+                    <div class="stat-chip stat-chip--green">
+                        <i class="fas fa-wifi"></i><span>En ligne</span>
                     </div>
                 </div>
+            </div>
 
-                <!-- Section Hysacam -->
-                <div class="admin-section">
-                    <h3><i class="fas fa-truck"></i> Planning Hysacam</h3>
-                    <div class="form-group">
-                        <input type="text" id="schedQuartier" class="form-control" placeholder="Quartier" style="margin-bottom:5px;">
-                        <input type="time" id="schedTime" class="form-control" style="margin-bottom:5px;">
-                        <button onclick="addSchedule()" class="btn-add">Ajouter Passage</button>
+            <!-- ── Tabs ── -->
+            <div class="admin-tabs">
+                <button class="admin-tab active" data-tab="reports" onclick="switchTab('reports')">
+                    <i class="fas fa-bell"></i> Alertes
+                </button>
+                <button class="admin-tab" data-tab="dispatch" onclick="switchTab('dispatch')">
+                    <i class="fas fa-truck"></i> Flotte
+                </button>
+                <button class="admin-tab" data-tab="depot" onclick="switchTab('depot')">
+                    <i class="fas fa-map-pin"></i> Dépôts
+                </button>
+                <button class="admin-tab" data-tab="history" onclick="switchTab('history')">
+                    <i class="fas fa-history"></i> Historique
+                </button>
+            </div>
+
+            <!-- ── Tab Content ── -->
+            <div class="admin-content">
+
+                <!-- TAB: Signalements -->
+                <div id="tab-reports" class="tab-panel active">
+                    <div class="section-intro">Signalements citoyens en attente d'intervention.</div>
+                    <div id="reportsList"></div>
+                </div>
+
+                <!-- TAB: Dispatch / Flotte -->
+                <div id="tab-dispatch" class="tab-panel">
+                    <div class="section-intro">Dépêchez un camion ou faites un <strong>clic droit</strong> sur la carte.</div>
+                    <div class="dispatch-form">
+                        <label class="field-label"><i class="fas fa-map-marker-alt"></i> Destination</label>
+                        <div class="form-group searchable-select">
+                            <div class="input-icon-wrap">
+                                <i class="fas fa-search input-icon"></i>
+                                <input type="text" id="schedQuartier" class="form-control form-control--icon" placeholder="Rechercher un quartier…" autocomplete="off">
+                            </div>
+                            <div id="schedQuartierList" class="dropdown-list"></div>
+                        </div>
+                        <label class="field-label" style="margin-top:12px;"><i class="far fa-clock"></i> Heure d'arrivée</label>
+                        <div class="input-icon-wrap">
+                            <i class="far fa-clock input-icon"></i>
+                            <input type="time" id="schedTime" class="form-control form-control--icon">
+                        </div>
+                        <button onclick="addSchedule()" class="btn-primary" style="margin-top:14px;">
+                            <i class="fas fa-paper-plane"></i> Dépêcher le Camion
+                        </button>
                     </div>
+                    <div class="section-divider"><span>Missions Actives</span></div>
                     <div id="scheduleList"></div>
                 </div>
 
-                <!-- Section Points Fixes -->
-                <div class="admin-section">
-                    <h3><i class="fas fa-map-marker-alt"></i> Points Fixes</h3>
-                    <div class="form-group">
-                        <input type="text" id="fixedName" class="form-control" placeholder="Nom du lieu" style="margin-bottom:5px;">
-                        <small style="color:red; display:block; margin-bottom:5px;">Cliquez sur la carte pour placer le point avant d'ajouter.</small>
-                        <button onclick="addFixedPoint()" class="btn-add" style="background:var(--accent)">Ajouter Point</button>
+                <!-- TAB: Points de Dépôt -->
+                <div id="tab-depot" class="tab-panel">
+                    <div class="section-intro">Faites un <strong>clic droit</strong> sur la carte, puis renseignez le nom du bac.</div>
+                    <div class="dispatch-form">
+                        <label class="field-label"><i class="fas fa-tag"></i> Nom du bac</label>
+                        <div class="input-icon-wrap">
+                            <i class="fas fa-tag input-icon"></i>
+                            <input type="text" id="fixedName" class="form-control form-control--icon" placeholder="Ex: Bac Carrefour Akwa">
+                        </div>
+                        <button onclick="addFixedPoint()" class="btn-primary btn-primary--green" style="margin-top:12px;">
+                            <i class="fas fa-plus-circle"></i> Ajouter le Bac
+                        </button>
                     </div>
+                    <div class="section-divider"><span>Bacs Enregistrés</span></div>
+                    <div id="fixedPointsList"></div>
+                </div>
+                <!-- TAB: Historique -->
+                <div id="tab-history" class="tab-panel">
+                    <div class="section-intro">Tous les signalements reçus (en cours et résolus).</div>
+                    <div id="historyList"><div class="loading-placeholder"><i class="fas fa-circle-notch fa-spin"></i> <span>Chargement…</span></div></div>
                 </div>
 
             </div>
         </aside>
 
-        <!-- Carte Admin -->
-        <div id="map" style="flex:1;"></div>
+        <!-- Map -->
+        <div class="map-wrapper">
+            <div id="map"></div>
+            <div class="map-hint"><i class="fas fa-mouse-pointer"></i> Clic droit sur la carte pour agir</div>
+
+            <!-- Stats pills rail on the right -->
+            <div class="stats-rail" id="statsRail">
+                <div class="stats-pill" id="pill-pending" data-label="Alertes en attente">
+                    <i class="fas fa-bell"></i><span>0</span>
+                </div>
+                <div class="stats-pill stats-pill--blue" id="pill-trucks" data-label="Camions en mission">
+                    <i class="fas fa-truck"></i><span>0</span>
+                </div>
+                <div class="stats-pill stats-pill--teal" id="pill-bins" data-label="Points de dépôt">
+                    <i class="fas fa-trash-alt"></i><span>0</span>
+                </div>
+                <div class="stats-pill stats-pill--red" id="pill-zones" data-label="Zones de risque actives">
+                    <i class="fas fa-exclamation-triangle"></i><span>0</span>
+                </div>
+                <div class="stats-pill stats-pill--green" id="pill-resolved" data-label="Résolus aujourd'hui">
+                    <i class="fas fa-check-circle"></i><span>0</span>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Modal photo -->
@@ -64,17 +144,34 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="animation.js"></script>
     <script>
         const API_BASE = 'http://localhost:3000/api';
         const DOUALA_CENTER = [4.0483, 9.7043];
         let map;
+        let isFirstLoad = true;
+        let knownReportIds = new Set();
         let markers = {};
+        let riskZones = []; // Array of L.circle for risk zones
         let tempMarker = null;
+
+        // --- Tab Navigation ---
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.admin-tab').forEach(b => b.classList.remove('active'));
+            document.getElementById('tab-' + tab).classList.add('active');
+            document.querySelector(`.admin-tab[data-tab="${tab}"]`).classList.add('active');
+            if (tab === 'history') loadHistory();
+        }
 
         window.onload = function() {
             initMap();
             loadData();
-            setInterval(pollReports, 8000); // Smart poll every 8s (no blink)
+            initSearchableSelect('schedQuartier', 'schedQuartierList', QUARTIERS_LIST);
+            startAnimationLoop(map, async (id) => {
+                await loadReports();
+            });
+            setInterval(pollReports, 8000);
         };
 
         function initMap() {
@@ -85,46 +182,104 @@
                 attribution: '© OpenStreetMap contributors'
             }).addTo(map);
 
-            map.on('click', (e) => {
-                if(tempMarker) map.removeLayer(tempMarker);
-                tempMarker = L.marker([e.latlng.lat, e.latlng.lng])
-                    .addTo(map)
-                    .bindPopup("Nouveau point fixe ?")
-                    .openPopup();
+            map.on('contextmenu', (e) => {
+                const lat = e.latlng.lat;
+                const lng = e.latlng.lng;
+                
+                const popupContent = `
+                    <div style="text-align:center; padding:5px; min-width: 200px;">
+                        <b style="color:#333; font-size:14px;">Action à cette position</b><br><br>
+                        <button onclick="setAsDestination(${lat}, ${lng})" style="margin-bottom:8px; width:100%; padding:8px; background:#28a745; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">🚛 Dépêcher un Camion</button><br>
+                        <button onclick="setAsFixedPoint(${lat}, ${lng})" style="width:100%; padding:8px; background:#007bff; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">🗑️ Placer un Bac (Point Fixe)</button>
+                    </div>
+                `;
+                
+                L.popup({ closeButton: true })
+                    .setLatLng(e.latlng)
+                    .setContent(popupContent)
+                    .openOn(map);
             });
         }
 
-        // Track which report IDs are already rendered
-        const knownReportIds = new Set();
-        let isFirstLoad = true;
+        // Context menu actions
+        function setAsDestination(lat, lng) {
+            if(tempMarker) map.removeLayer(tempMarker);
+            tempMarker = L.marker([lat, lng])
+                .addTo(map)
+                .bindPopup("Destination Camion Sélectionnée")
+                .openPopup();
+            
+            const qInput = document.getElementById('schedQuartier');
+            qInput.value = "Zone Personnalisée";
+            map.closePopup();
+            
+            // Focus time input to prompt next step
+            document.getElementById('schedTime').focus();
+        }
+
+        function setAsFixedPoint(lat, lng) {
+            if(tempMarker) map.removeLayer(tempMarker);
+            tempMarker = L.marker([lat, lng])
+                .addTo(map)
+                .bindPopup("Position du Bac Sélectionnée")
+                .openPopup();
+            
+            map.closePopup();
+            
+            // Focus name input to prompt next step
+            document.getElementById('fixedName').focus();
+        }
+
 
         async function loadData() {
-            await Promise.all([loadReports(), loadSchedules(), loadFixedPoints()]);
+            const [rep, sched, fixed] = await Promise.all([
+                fetch(`${API_BASE}/reports`).then(r => r.json()),
+                fetch(`${API_BASE}/schedules`).then(r => r.json()),
+                fetch(`${API_BASE}/fixed-points`).then(r => r.json())
+            ]);
+            
+            await loadReports(rep, fixed);
+            await loadSchedules(sched);
+            await loadFixedPoints(fixed);
             isFirstLoad = false;
         }
 
         // Called on interval — only updates reports, no map/schedule flicker
         async function pollReports() {
-            await loadReports();
+            const [rep, fixed] = await Promise.all([
+                fetch(`${API_BASE}/reports`).then(r => r.json()),
+                fetch(`${API_BASE}/fixed-points`).then(r => r.json())
+            ]);
+            await loadReports(rep, fixed);
         }
 
-        async function loadReports() {
+        async function loadReports(reports, fixedPoints) {
             const list = document.getElementById('reportsList');
             try {
-                const res = await fetch(`${API_BASE}/reports`);
-                const reports = await res.json();
+                if (!reports) {
+                    const res = await fetch(`${API_BASE}/reports`);
+                    reports = await res.json();
+                }
+                if (!fixedPoints) {
+                    fixedPoints = await (await fetch(`${API_BASE}/fixed-points`)).json();
+                }
 
-                const pending = reports.filter(r => r.status === 'pending');
-                const pendingIds = new Set(pending.map(r => r.id));
+                const activeSidebar = reports.filter(r => r.status === 'pending');
+                const activeIds = new Set(activeSidebar.map(r => r.id));
+                const pendingIds = activeIds; // all active are pending now
 
-                // Update counter
-                document.getElementById('reportCount').textContent =
-                    `${pending.length} signalement(s) en attente`;
+                // Update counter chip
+                const countChip = document.getElementById('reportCount');
+                if (countChip) {
+                    const span = countChip.querySelector('span');
+                    if (span) span.textContent = `${activeSidebar.length} signalement(s)`;
+                    if (!isFirstLoad && activeSidebar.length > 0) countChip.classList.add('stat-chip--alert');
+                    else countChip.classList.remove('stat-chip--alert');
+                }
 
-                // --- Remove resolved reports from DOM + map (smooth fade-out) ---
+                // --- Remove old reports from DOM + map (smooth fade-out) ---
                 knownReportIds.forEach(id => {
-                    if (!pendingIds.has(id)) {
-                        // Fade out then remove the card
+                    if (!activeIds.has(id)) {
                         const card = document.getElementById(`report-card-${id}`);
                         if (card) {
                             card.style.transition = 'opacity 0.4s, transform 0.4s';
@@ -132,92 +287,163 @@
                             card.style.transform = 'translateX(-20px)';
                             setTimeout(() => card.remove(), 420);
                         }
-                        // Remove marker from map
-                        if (markers['rep_' + id]) {
-                            map.removeLayer(markers['rep_' + id]);
-                            delete markers['rep_' + id];
-                        }
                         knownReportIds.delete(id);
                     }
+                    if (!pendingIds.has(id) && markers['rep_' + id]) {
+                        map.removeLayer(markers['rep_' + id]);
+                        delete markers['rep_' + id];
+                    }
                 });
 
-                // --- Add only NEW reports ---
-                pending.forEach(r => {
-                    if (knownReportIds.has(r.id)) return; // Already rendered
-                    knownReportIds.add(r.id);
+                // --- Risk Zones ---
+                drawRiskZones(reports, fixedPoints);
 
-                    const emoji = '🗑️';
+                // --- Manage animated markers for SCHEDULES ---
+                updateAnimatedTrucks(map, await (await fetch(`${API_BASE}/schedules`)).json(), false);
 
-                    // Build card
-                    const div = document.createElement('div');
-                    div.className = 'report-item' + (isFirstLoad ? '' : ' report-item-new');
-                    div.id = `report-card-${r.id}`;
-                    div.innerHTML = `
-                        <div class="report-header">
-                            <span>${emoji} ${r.quartier}</span>
-                            <button onclick="resolveReport(${r.id})" class="btn-resolve">Résolu</button>
-                        </div>
-                        <div class="report-type">${r.type}</div>
-                        <div class="report-identity">
-                            <i class="fas fa-user"></i> ${r.nom} &nbsp;|&nbsp; <i class="fas fa-phone"></i> ${r.telephone}
-                        </div>
-                        ${r.photo ? `<div class="report-photo-thumb" onclick="openPhotoModal('${r.photo}')">
-                            <img src="/uploads/${r.photo}" alt="Photo">
-                            <span>Voir photo</span>
-                        </div>` : ''}
-                        <div class="report-actions">
-                            <button onclick="viewZone(${r.id})" class="btn-view-zone">
-                                <i class="fas fa-map-marker-alt"></i> Voir Zone
-                            </button>
-                        </div>
-                        <small>${r.date}</small>
-                    `;
-                    // Prepend so newest appear at top
-                    list.prepend(div);
+                // --- RENDER alerts as table ---
+                // Remove loading spinner once
+                const spinner = list.querySelector('.loading-placeholder');
+                if (spinner) spinner.remove();
 
-                    // Add map marker
-                    const popupContent = `
-                        <b>${emoji} ${r.quartier}</b><br>
-                        ${r.type}<br>
-                        <small><i class='fas fa-user'></i> ${r.nom} — ${r.telephone}</small><br>
-                        ${r.photo ? `<img src='/uploads/${r.photo}' style='width:100%;max-width:180px;border-radius:6px;margin-top:6px;cursor:pointer' onclick="openPhotoModal('${r.photo}')">` : ''}
-                        <br><button onclick="resolveReport(${r.id})" style="margin-top:8px;background:#28a745;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer">Résoudre</button>
-                    `;
-                    const m = L.marker([r.lat, r.lng], {
-                        icon: L.divIcon({
-                            className: 'report-marker',
-                            html: `<div class="marker-bubble"><span class="marker-emoji">${emoji}</span></div>`,
-                            iconSize: [44, 44],
-                            iconAnchor: [22, 44],
-                            popupAnchor: [0, -44]
-                        })
-                    }).addTo(map).bindPopup(popupContent);
-                    m.on('dblclick', (e) => {
-                        L.DomEvent.stop(e); // Stronger stop propagation
-                        if (map.getZoom() < 17) {
-                            map.flyTo([r.lat, r.lng], 17, { animate: true, duration: 1.0 });
+                if (activeSidebar.length === 0 && knownReportIds.size === 0) {
+                    if (!list.querySelector('.no-reports-msg')) {
+                        list.innerHTML = `<div class="no-reports-msg">
+                            <i class="fas fa-check-circle" style="color:#057a55; font-size:1.6rem;"></i>
+                            <span>Aucun signalement en attente</span>
+                        </div>`;
+                    }
+                } else {
+                    const noMsg = list.querySelector('.no-reports-msg');
+                    if (noMsg) noMsg.remove();
+
+                    // Ensure table wrapper exists
+                    let tbl = list.querySelector('.alerts-table');
+                    if (!tbl) {
+                        tbl = document.createElement('table');
+                        tbl.className = 'alerts-table';
+                        tbl.innerHTML = `<thead><tr>
+                            <th>Zone</th><th>Type</th><th>Contact</th><th>Date</th><th></th>
+                        </tr></thead><tbody id="alertsTableBody"></tbody>`;
+                        list.appendChild(tbl);
+                    }
+
+                    activeSidebar.forEach(r => {
+                        // If card already exists and unchanged, skip
+                        if (knownReportIds.has(r.id) && document.getElementById(`report-card-${r.id}`)) return;
+                        knownReportIds.add(r.id);
+
+                        const tbody = document.getElementById('alertsTableBody');
+                        const tr = document.createElement('tr');
+                        tr.id = `report-card-${r.id}`;
+                        tr.setAttribute('data-status', r.status);
+                        tr.className = isFirstLoad ? '' : 'row-new';
+                        tr.innerHTML = `
+                            <td><span class="tbl-zone">🚨 ${r.quartier}</span></td>
+                            <td><span class="tbl-badge">${r.type}</span></td>
+                            <td class="tbl-contact"><i class="fas fa-user"></i> ${r.nom}<br><i class="fas fa-phone"></i> ${r.telephone}</td>
+                            <td class="tbl-date">${r.date.split(' ')[0] || r.date}</td>
+                            <td class="tbl-actions">
+                                <button onclick="viewZone(${r.id})" class="tbl-btn tbl-btn--view" title="Voir sur carte">
+                                    <i class="fas fa-map-marker-alt"></i>
+                                </button>
+                                <button onclick="resolveReport(${r.id})" class="tbl-btn tbl-btn--resolve" title="Marquer résolu">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                            </td>
+                        `;
+                        tbody.prepend(tr);
+
+                        // Map marker
+                        if (!markers['rep_' + r.id]) {
+                            const popupContent = `<b>🚨 ${r.quartier}</b><br>${r.type}<br><small>${r.nom} — ${r.telephone}</small>
+                                ${r.photo ? `<br><img src='/uploads/${r.photo}' style='width:100%;max-width:180px;border-radius:6px;margin-top:6px;cursor:pointer' onclick="openPhotoModal('${r.photo}')">` : ''}
+                                <div style="margin-top:8px;">
+                                    <button onclick="resolveReport(${r.id})" style="background:#057a55;color:#fff;border:none;padding:4px 8px;border-radius:4px;cursor:pointer">Résoudre</button>
+                                </div>`;
+                            const m = L.marker([r.lat, r.lng], {
+                                icon: L.divIcon({
+                                    className: 'report-marker',
+                                    html: `<div class="marker-bubble"><span class="marker-emoji">🚨</span></div>`,
+                                    iconSize: [44, 44], iconAnchor: [22, 44], popupAnchor: [0, -44]
+                                })
+                            }).addTo(map).bindPopup(popupContent);
+                            m.on('dblclick', e => { L.DomEvent.stop(e); if (map.getZoom() < 17) map.flyTo([r.lat, r.lng], 17, { animate: true, duration: 1.0 }); });
+                            markers['rep_' + r.id] = m;
                         }
                     });
-                    markers['rep_' + r.id] = m;
-                });
-
-                // Show "all clear" only if list is actually empty
-                const noMsg = list.querySelector('.no-reports-msg');
-                if (pending.length === 0 && knownReportIds.size === 0) {
-                    if (!noMsg) {
-                        const p = document.createElement('p');
-                        p.className = 'no-reports-msg';
-                        p.style.cssText = 'color:#4caf50;font-size:0.85rem;';
-                        p.innerHTML = '<i class="fas fa-check-circle"></i> Aucun signalement en attente.';
-                        list.appendChild(p);
-                    }
-                } else if (noMsg) {
-                    noMsg.remove();
                 }
+
+                // --- Update stats pills ---
+                updateStatsPills(reports, fixedPoints);
 
             } catch (err) {
                 // Don't destroy the list on a network hiccup — just log it
                 console.warn('Poll error (non-fatal):', err.message);
+            }
+        }
+
+        // --- Stats Pills ---
+        function updateStatsPills(reports, fixedPoints) {
+            const today = new Date().toDateString();
+            const pending  = reports.filter(r => r.status === 'pending').length;
+            const resolved = reports.filter(r => r.status === 'resolved' && new Date(r.date).toDateString() === today).length;
+            const bins     = fixedPoints ? fixedPoints.length : 0;
+            const zones    = riskZones ? riskZones.length : 0;
+            const trucks   = Object.keys(animatedTrucks || {}).length;
+
+            const set = (id, val) => {
+                const el = document.getElementById(id);
+                if (el) el.querySelector('span').textContent = val;
+            };
+            set('pill-pending',  pending);
+            set('pill-trucks',   trucks);
+            set('pill-bins',     bins);
+            set('pill-zones',    zones);
+            set('pill-resolved', resolved);
+        }
+
+        // --- History Tab ---
+        async function loadHistory() {
+            const container = document.getElementById('historyList');
+            try {
+                const res = await fetch(`${API_BASE}/reports`);
+                const all = await res.json();
+                const sorted = [...all].sort((a, b) => b.id - a.id);
+                container.innerHTML = '';
+
+                if (sorted.length === 0) {
+                    container.innerHTML = '<div class="no-reports-msg"><i class="fas fa-inbox" style="font-size:1.6rem;color:#94a3b8"></i><span>Aucun historique disponible</span></div>';
+                    return;
+                }
+
+                const tbl = document.createElement('table');
+                tbl.className = 'alerts-table';
+                tbl.innerHTML = `<thead><tr>
+                    <th>Zone</th><th>Type</th><th>Contact</th><th>Date</th><th>Statut</th>
+                </tr></thead>`;
+                const tbody = document.createElement('tbody');
+
+                sorted.forEach(r => {
+                    const tr = document.createElement('tr');
+                    const isPending  = r.status === 'pending';
+                    const badge      = isPending
+                        ? `<span class="tbl-badge tbl-badge--danger">En attente</span>`
+                        : `<span class="tbl-badge tbl-badge--success">Résolu</span>`;
+                    tr.innerHTML = `
+                        <td><span class="tbl-zone">${isPending ? '🚨' : '✅'} ${r.quartier}</span></td>
+                        <td><span class="tbl-badge">${r.type}</span></td>
+                        <td class="tbl-contact"><i class="fas fa-user"></i> ${r.nom}<br><i class="fas fa-phone"></i> ${r.telephone}</td>
+                        <td class="tbl-date">${(r.date || '').split(' ')[0]}</td>
+                        <td>${badge}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                tbl.appendChild(tbody);
+                container.appendChild(tbl);
+            } catch(e) {
+                container.innerHTML = '<div class="section-intro" style="color:red;">Erreur de chargement.</div>';
             }
         }
 
@@ -227,52 +453,213 @@
                 const res = await fetch(`${API_BASE}/schedules`);
                 const schedules = await res.json();
                 schedList.innerHTML = '';
-                schedules.forEach(s => {
+                
+                // Active schedules for sidebar list
+                const activeSchedules = schedules.filter(s => s.status === 'dispatched' || s.status === 'returning');
+
+                activeSchedules.forEach(s => {
                     const li = document.createElement('div');
-                    li.className = 'schedule-item';
-                    li.innerHTML = `<span>${s.quartier} - ${s.time}</span> <i class="fas fa-times" style="cursor:pointer" onclick="removeSchedule(${s.id})"></i>`;
+                    li.className = 'report-item'; // Use the same nice card style as reports
+                    li.style.cursor = 'pointer';
+                    li.innerHTML = `
+                        <div class="report-header">
+                            <span>🚛 ${s.quartier}</span>
+                            <div class="header-btns">
+                                ${s.status === 'dispatched' ? `<button onclick="resolveSchedule(${s.id})" class="btn-resolve" style="font-size:0.75rem;">Terminer</button>` : `<span class="status-badge" style="background:#6c757d; font-size:0.7rem;">Retour...</span>`}
+                                <i class="fas fa-times" style="cursor:pointer; color:#dc3545; margin-left:8px;" onclick="removeSchedule(${s.id})"></i>
+                            </div>
+                        </div>
+                        <div style="font-size:0.8rem; color:#666; margin-top:5px;">
+                            <i class="far fa-clock"></i> Arrivée prévue: ${s.time}
+                        </div>
+                    `;
+                    
+                    // Click to zoom on truck
+                    li.onclick = (e) => {
+                        // Prevent zoom if clicking buttons or icons
+                        if (e.target.tagName.toLowerCase() === 'button' || e.target.tagName.toLowerCase() === 'i') return;
+                        
+                        const truck = animatedTrucks[s.id];
+                        if (truck && truck.marker) {
+                            const latlng = truck.marker.getLatLng();
+                            map.flyTo(latlng, 17, { animate: true, duration: 1.2 });
+                            // Open popup after flying
+                            setTimeout(() => truck.marker.openPopup(), 1300);
+                        } else {
+                            map.flyTo([s.lat, s.lng], 16, { animate: true });
+                        }
+                    };
+
                     schedList.appendChild(li);
-
-                    const m = L.marker(DOUALA_CENTER, {
-                        icon: L.divIcon({
-                            className: 'hysacam-marker',
-                            html: '<div class="marker-bubble-small">🚛</div>',
-                            iconSize: [36, 36],
-                            iconAnchor: [18, 36]
-                        })
-                    }).addTo(map).bindPopup(`<b>Hysacam</b><br>${s.quartier} à ${s.time}`);
-
-                    m.on('dblclick', (e) => {
-                        L.DomEvent.stopPropagation(e);
-                        if (map.getZoom() < 16) map.flyTo(DOUALA_CENTER, 16, { animate: true, duration: 1.0 });
-                    });
                 });
             } catch (err) {
                 console.error('Schedules error:', err.message);
             }
         }
 
+        // --- Analyse Zones de Risque (Heatmap) ---
+        function drawRiskZones(reports, fixedPoints) {
+            // Remove old zones
+            riskZones.forEach(z => map.removeLayer(z));
+            riskZones = [];
+
+            if (reports.length < 3) return;
+
+            const clusters = [];
+            const RADIUS_METERS = 80; // Distance to group reports
+            const MIN_REPORTS = 3;    // Minimum reports to form a risk zone
+
+            reports.forEach(r => {
+                let added = false;
+                for (let cluster of clusters) {
+                    const dist = map.distance([r.lat, r.lng], cluster.center);
+                    if (dist < RADIUS_METERS) {
+                        cluster.reports.push(r);
+                        cluster.center = [
+                            (cluster.center[0] * (cluster.reports.length - 1) + r.lat) / cluster.reports.length,
+                            (cluster.center[1] * (cluster.reports.length - 1) + r.lng) / cluster.reports.length
+                        ];
+                        added = true;
+                        break;
+                    }
+                }
+                if (!added) {
+                    clusters.push({ center: [r.lat, r.lng], reports: [r] });
+                }
+            });
+
+            clusters.forEach(c => {
+                if (c.reports.length >= MIN_REPORTS) {
+                    // Check for nearby bins
+                    let newestBinNearby = null;
+                    fixedPoints.forEach(f => {
+                        const dist = map.distance(c.center, [f.lat, f.lng]);
+                        if (dist < 100) {
+                            if (!newestBinNearby || new Date(f.created_at) > new Date(newestBinNearby.created_at)) {
+                                newestBinNearby = f;
+                            }
+                        }
+                    });
+
+                    let zoneColor = 'red';
+                    let zoneStatus = 'Risque Élevé';
+                    let isVisible = true;
+
+                    if (newestBinNearby) {
+                        // Use 1970 for old bins without timestamps
+                        const binTime = newestBinNearby.created_at ? new Date(newestBinNearby.created_at).getTime() : 0;
+                        const now = Date.now();
+                        const hoursSinceBin = (now - binTime) / (1000 * 60 * 60);
+
+                        if (hoursSinceBin < 24 && binTime > 0) {
+                            // Check if any report is NEWER than the bin
+                            const hasNewAlerts = c.reports.some(r => new Date(r.date).getTime() > binTime);
+                            if (hasNewAlerts) {
+                                zoneColor = 'red';
+                                zoneStatus = 'Risque (Récurrence après bac)';
+                            } else {
+                                zoneColor = 'green';
+                                zoneStatus = 'Zone en Observation (Bac placé)';
+                            }
+                        } else {
+                            // Bin is older than 24h (or timestamp missing) and no new alerts? Zone disappears
+                            const hasNewAlerts = c.reports.some(r => new Date(r.date).getTime() > binTime);
+                            if (!hasNewAlerts) isVisible = false;
+                            else {
+                                zoneColor = 'red';
+                                zoneStatus = 'Risque (Récurrence à long terme)';
+                            }
+                        }
+                    }
+
+                    if (isVisible) {
+                        const circle = L.circle(c.center, {
+                            color: zoneColor,
+                            fillColor: zoneColor === 'red' ? '#f03' : '#28a745',
+                            fillOpacity: 0.2,
+                            radius: 120,
+                            weight: 2,
+                            dashArray: '5, 5'
+                        }).addTo(map);
+
+                        circle.bindPopup(`
+                            <div style="text-align:center;">
+                                <b style="color:${zoneColor};">⚠️ ${zoneStatus}</b><br>
+                                ${c.reports.length} signalements détectés.<br>
+                                ${zoneColor === 'red' ? '<small>Besoin d\'un bac ou d\'une intervention.</small>' : '<small>Efficacité du bac en cours d\'évaluation (24h).</small>'}
+                            </div>
+                        `);
+                        riskZones.push(circle);
+                    }
+                }
+            });
+        }
+
         async function loadFixedPoints() {
+            const container = document.getElementById('fixedPointsList');
             try {
                 const res = await fetch(`${API_BASE}/fixed-points`);
                 const points = await res.json();
+                
+                // Clear existing markers for fixed points to avoid duplicates
+                Object.keys(markers).forEach(key => {
+                    if (key.startsWith('fix_')) {
+                        map.removeLayer(markers[key]);
+                        delete markers[key];
+                    }
+                });
+                container.innerHTML = '';
+
                 points.forEach(f => {
+                    // Marker
                     const m = L.marker([f.lat, f.lng], {
                         icon: L.divIcon({
                             className: 'fixed-marker',
-                            html: '<div class="marker-bubble-small">♻️</div>',
+                            html: '<div class="marker-bubble-small">🗑️</div>',
                             iconSize: [36, 36],
                             iconAnchor: [18, 36]
                         })
-                    }).addTo(map).bindPopup(`<b>Point Fixe</b><br>${f.name}`);
+                    }).addTo(map).bindPopup(`<b>Point de Dépôt</b><br>${f.name}`);
+                    markers['fix_' + f.id] = m;
 
                     m.on('dblclick', (e) => {
                         L.DomEvent.stopPropagation(e);
                         if (map.getZoom() < 16) map.flyTo([f.lat, f.lng], 16, { animate: true, duration: 1.0 });
                     });
+
+                    // Sidebar Item
+                    const item = document.createElement('div');
+                    item.className = 'schedule-item'; // repurpose the style
+                    item.style.padding = '8px';
+                    item.style.marginBottom = '5px';
+                    item.style.background = '#f8f9fa';
+                    item.style.borderRadius = '5px';
+                    item.style.display = 'flex';
+                    item.style.justifyContent = 'space-between';
+                    item.style.alignItems = 'center';
+                    item.innerHTML = `
+                        <span style="font-size:0.9rem;">🗑️ ${f.name}</span>
+                        <i class="fas fa-times" style="color:red; cursor:pointer;" onclick="deleteFixedPoint(${f.id})"></i>
+                    `;
+                    item.onclick = (e) => {
+                        if (e.target.tagName.toLowerCase() === 'i') return;
+                        map.flyTo([f.lat, f.lng], 17, { animate: true });
+                        m.openPopup();
+                    };
+                    container.appendChild(item);
                 });
             } catch (err) {
                 console.error('Fixed points error:', err.message);
+            }
+        }
+
+        async function deleteFixedPoint(id) {
+            if (!confirm("Supprimer ce point de dépôt ?")) return;
+            try {
+                await fetch(`${API_BASE}/fixed-points/${id}`, { method: 'DELETE' });
+                await loadFixedPoints();
+            } catch (err) {
+                alert('Erreur: ' + err.message);
             }
         }
 
@@ -305,20 +692,51 @@
             }
         }
 
+        async function resolveSchedule(id) {
+            try {
+                await fetch(`${API_BASE}/schedules/${id}`, { method: 'DELETE' });
+                await loadSchedules();
+                await loadReports(); // triggers animation update to remove it from map
+            } catch (err) {
+                alert('Erreur: ' + err.message);
+            }
+        }
+
         async function addSchedule() {
-            const q = document.getElementById('schedQuartier').value.trim();
+            let q = document.getElementById('schedQuartier').value.trim();
             const t = document.getElementById('schedTime').value;
-            if (!q || !t) return alert("Remplissez les champs");
+            
+            if (!t) return alert("Remplissez l'heure d'arrivée");
+
+            let coords;
+            if (tempMarker) {
+                // Use clicked map point
+                const latlng = tempMarker.getLatLng();
+                coords = { lat: latlng.lat, lng: latlng.lng };
+                if (!q) q = "Zone Personnalisée";
+            } else {
+                // Use dropdown quarter
+                if (!q) return alert("Sélectionnez un quartier ou cliquez sur la carte");
+                coords = QUARTIERS_DATA[q];
+                if (!coords) return alert(`Quartier '${q}' non reconnu. Sélectionnez dans la liste ou cliquez sur la carte.`);
+            }
 
             try {
                 await fetch(`${API_BASE}/schedules`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ quartier: q, time: t })
+                    body: JSON.stringify({ quartier: q, time: t, lat: coords.lat, lng: coords.lng })
                 });
+                
+                if (tempMarker) {
+                    map.removeLayer(tempMarker);
+                    tempMarker = null;
+                }
+                
                 document.getElementById('schedQuartier').value = '';
                 document.getElementById('schedTime').value = '';
                 await loadSchedules();
+                await loadReports(); // Triggers instant animation update
             } catch (err) {
                 alert('Erreur: ' + err.message);
             }
@@ -345,10 +763,13 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name, lat: latlng.lat, lng: latlng.lng })
                 });
-                map.removeLayer(tempMarker);
-                tempMarker = null;
+                if (tempMarker) {
+                    map.removeLayer(tempMarker);
+                    tempMarker = null;
+                }
                 document.getElementById('fixedName').value = '';
                 await loadFixedPoints();
+                await pollReports(); // NEW: Force immediate risk zone update after adding bin
             } catch (err) {
                 alert('Erreur: ' + err.message);
             }
@@ -363,6 +784,51 @@
         function closePhotoModal() {
             document.getElementById('photoModal').style.display = 'none';
             document.getElementById('photoModalImg').src = '';
+        }
+
+        // --- Searchable Dropdown ---
+        function initSearchableSelect(inputId, listId, options) {
+            const input = document.getElementById(inputId);
+            const list = document.getElementById(listId);
+
+            input.addEventListener('focus', () => {
+                renderList(input.value);
+                list.style.display = 'block';
+            });
+
+            input.addEventListener('input', () => {
+                renderList(input.value);
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!input.contains(e.target) && !list.contains(e.target)) {
+                    list.style.display = 'none';
+                }
+            });
+
+            function renderList(filter) {
+                list.innerHTML = '';
+                const filtered = options.filter(q =>
+                    q.toLowerCase().includes(filter.toLowerCase())
+                );
+                if (filtered.length > 0) {
+                    filtered.forEach(q => {
+                        const item = document.createElement('div');
+                        item.className = 'dropdown-item';
+                        item.textContent = q;
+                        item.onclick = () => {
+                            input.value = q;
+                            list.style.display = 'none';
+                        };
+                        list.appendChild(item);
+                    });
+                } else {
+                    const noRes = document.createElement('div');
+                    noRes.className = 'dropdown-item no-results';
+                    noRes.textContent = "Aucun résultat";
+                    list.appendChild(noRes);
+                }
+            }
         }
     </script>
 </body>
