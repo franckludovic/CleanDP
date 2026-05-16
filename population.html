@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signalement Déchets - Douala</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Carte Leaflet -->
+        <div id="map"></div>
+
+        <!-- Formulaire Flottant -->
+        <div class="pop-panel">
+            <div class="pop-header">
+                <img src="logo_cud4.png" class="logo_cud4">
+                <h2><i class="fas fa-trash-alt"></i> Signaler un Déchet</h2>
+                <p>Signalez un problème à la CUD (Douala).</p>
+            </div>
+            <form id="reportForm" enctype="multipart/form-data">
+
+                <!-- Identité du citoyen -->
+                <div class="form-section-title">
+                    <i class="fas fa-user-circle"></i> Vos Informations
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-user"></i> Nom complet</label>
+                    <input type="text" id="nomCitoyen" class="form-control" placeholder="Ex: Jean Dupont" required>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-phone"></i> Numéro de téléphone</label>
+                    <input type="tel" id="telephone" class="form-control" placeholder="Ex: 6XX XXX XXX" required>
+                </div>
+
+                <!-- Localisation -->
+                <div class="form-section-title">
+                    <i class="fas fa-map-marker-alt"></i> Localisation
+                </div>
+
+                <button type="button" class="btn-gps" onclick="getLocation()">
+                    <i class="fas fa-crosshairs"></i> Activer ma Position (GPS)
+                </button>
+
+                <div class="form-group">
+                    <label>Vos Coordonnées</label>
+                    <input type="text" id="gpsCoords" class="form-control" placeholder="Cliquez sur Activer GPS..." readonly required>
+                </div>
+
+                <div class="form-group searchable-select">
+                    <label>Quartier</label>
+                    <input type="text" id="quartier" class="form-control" placeholder="Rechercher ou taper un quartier..." required autocomplete="off">
+                    <div id="quartierList" class="dropdown-list"></div>
+                </div>
+
+                <!-- Détails -->
+                <div class="form-section-title">
+                    <i class="fas fa-exclamation-triangle"></i> Détails du problème
+                </div>
+
+                <div class="form-group searchable-select">
+                    <label>Description du problème</label>
+                    <input type="text" id="typeProblem" class="form-control" placeholder="Décrivez le problème..." required autocomplete="off">
+                    <div id="typeProblemList" class="dropdown-list"></div>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-camera"></i> Photo (optionnel)</label>
+                    <label for="photoInput" class="photo-upload-label" id="photoLabelContainer">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <span id="photoLabel">Cliquez pour ajouter une photo</span>
+                    </label>
+                    <input type="file" id="photoInput" accept="image/*" style="display:none">
+                    
+                    <div id="photoPreview" class="photo-preview" style="display:none">
+                        <img id="previewImg" src="">
+                        <button type="button" class="remove-photo-btn" onclick="removePhoto()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Submit -->
+                <div id="submitStatus" class="submit-status" style="display:none"></div>
+
+                <button type="submit" class="btn-submit" id="submitBtn">
+                    <i class="fas fa-paper-plane"></i> Envoyer le signalement
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // --- Configuration ---
+        const API_BASE = 'http://localhost:3000/api';
+        const CUD_COORDS = [4.0483, 9.7043];
+        let map;
+        let userMarker;
+        const markers = [];
+
+        // --- Données ---
+        const QUARTIERS = ["Akwa", "Bonanjo", "Bonapriso", "Deido", "New Bell", "Bassa", "Kotto", "Makepé", "Logbessou"];
+        const PROBLEMS = [
+            "Tas d'ordures sur le trottoir",
+            "Ordures au quartier",
+            "Tas d'ordures sur la chaussée",
+            "Tas d'ordures qui déborde le bac sur le trottoir",
+            "Tas de dépôts d'ordures"
+        ];
+
+        // --- Initialisation ---
+        window.onload = function() {
+            initMap();
+            loadInitialData();
+            setInterval(pollData, 10000); // Poll for updates every 10s
+            initSearchableSelect('quartier', 'quartierList', QUARTIERS, "Quartier non trouvé");
+            initSearchableSelect('typeProblem', 'typeProblemList', PROBLEMS, "Problème non trouvé");
+            initPhotoUpload();
+        };
+
+        const reportMarkers = {}; // Store markers by ID for smart updates
+
+        async function loadInitialData() {
+            await pollData();
+        }
+
+        async function pollData() {
+            try {
+                // 1. Points Fixes & Hysacam (Load once or rarely, keeping it simple)
+                if (Object.keys(reportMarkers).length === 0) {
+                    await loadStaticAssets();
+                }
+
+                // 2. Poll Reports (The dynamic part)
+                const repRes = await fetch(`${API_BASE}/reports`);
+                const reports = await repRes.json();
+                const pending = reports.filter(r => r.status === 'pending');
+                const pendingIds = new Set(pending.map(r => r.id));
+
+                // Remove resolved or deleted markers
+                Object.keys(reportMarkers).forEach(id => {
+                    if (!pendingIds.has(Number(id))) {
+                        map.removeLayer(reportMarkers[id]);
+                        delete reportMarkers[id];
+                    }
+                });
+
+                // Add only new markers
+                pending.forEach(r => {
+                    if (reportMarkers[r.id]) return;
+
+                    const m = L.marker([r.lat, r.lng], {
+                        icon: L.divIcon({
+                            className: 'report-marker',
+                            html: '<div class="marker-bubble"><span class="marker-emoji">🗑️</span></div>',
+                            iconSize: [44, 44],
+                            iconAnchor: [22, 44],
+                            popupAnchor: [0, -44]
+                        })
+                    }).addTo(map).bindPopup(`<b>${r.quartier}</b><br>${r.type}<br><small>${r.date}</small>`);
+
+                    // Interaction: Single click opens popup (default). Double-click zooms in.
+                    m.on('dblclick', (e) => {
+                        L.DomEvent.stopPropagation(e); // Prevent map dblclick zoom
+                        if (map.getZoom() < 17) {
+                            map.flyTo([r.lat, r.lng], 17, { animate: true, duration: 1.0 });
+                        }
+                    });
+                    
+                    reportMarkers[r.id] = m;
+                });
+
+            } catch (err) {
+                console.warn('Poll error:', err.message);
+            }
+        }
+
+        async function loadStaticAssets() {
+            try {
+                // Points Fixes
+                const fixedRes = await fetch(`${API_BASE}/fixed-points`);
+                const fixedPoints = await fixedRes.json();
+                fixedPoints.forEach(pt => {
+                    const m = L.marker([pt.lat, pt.lng], {
+                        icon: L.divIcon({
+                            className: 'fixed-marker',
+                            html: '<div class="marker-bubble-small">♻️</div>',
+                            iconSize: [36, 36],
+                            iconAnchor: [18, 36]
+                        })
+                    }).addTo(map).bindPopup(`<b>Point Fixe:</b> ${pt.name}`);
+                    m.on('dblclick', (e) => {
+                        L.DomEvent.stopPropagation(e);
+                        if (map.getZoom() < 16) map.flyTo([pt.lat, pt.lng], 16, { animate: true, duration: 1.0 });
+                    });
+                });
+
+                // Plannings Hysacam
+                const schedRes = await fetch(`${API_BASE}/schedules`);
+                const schedules = await schedRes.json();
+                schedules.forEach(sch => {
+                    const m = L.marker(CUD_COORDS, {
+                        icon: L.divIcon({
+                            className: 'hysacam-marker',
+                            html: '<div class="marker-bubble-small">🚛</div>',
+                            iconSize: [36, 36],
+                            iconAnchor: [18, 36]
+                        })
+                    }).addTo(map).bindPopup(`<b>Hysacam</b><br>Quartier: ${sch.quartier}<br>Heure: ${sch.time}`);
+                    m.on('dblclick', (e) => {
+                        L.DomEvent.stopPropagation(e);
+                        if (map.getZoom() < 16) map.flyTo(CUD_COORDS, 16, { animate: true, duration: 1.0 });
+                    });
+                });
+            } catch(e) {}
+        }
+
+        // --- Carte ---
+        function initMap() {
+            map = L.map('map', {
+                doubleClickZoom: false
+            }).setView(CUD_COORDS, 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+        }
+
+        // --- Géolocalisation ---
+        function getLocation() {
+            const input = document.getElementById('gpsCoords');
+            input.value = "Recherche satellite...";
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        input.value = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                        map.setView([lat, lng], 16);
+                        if(userMarker) map.removeLayer(userMarker);
+                        userMarker = L.marker([lat, lng]).addTo(map).bindPopup("Vous êtes ici").openPopup();
+                    },
+                    () => {
+                        alert("Erreur GPS. Veuillez autoriser la localisation.");
+                        input.value = "";
+                    }
+                );
+            } else {
+                alert("Votre navigateur ne supporte pas la géolocalisation.");
+            }
+        }
+
+        // --- Photo Upload ---
+        function initPhotoUpload() {
+            const photoInput = document.getElementById('photoInput');
+            const photoLabel = document.getElementById('photoLabel');
+            const photoPreview = document.getElementById('photoPreview');
+            const previewImg = document.getElementById('previewImg');
+
+            // Logic: The <label> for attribute handles the click automatically.
+            // No manual photoInput.click() needed.
+
+            photoInput.addEventListener('change', () => {
+                const file = photoInput.files[0];
+                if (!file) return;
+                photoLabel.textContent = file.name;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    previewImg.src = e.target.result;
+                    photoPreview.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function removePhoto() {
+            document.getElementById('photoInput').value = '';
+            document.getElementById('photoLabel').textContent = 'Cliquez pour ajouter une photo';
+            document.getElementById('photoPreview').style.display = 'none';
+            document.getElementById('previewImg').src = '';
+        }
+
+        // --- Searchable Dropdowns ---
+        function initSearchableSelect(inputId, listId, options, noResText) {
+            const input = document.getElementById(inputId);
+            const list = document.getElementById(listId);
+
+            input.addEventListener('focus', () => {
+                renderList(input.value);
+                list.style.display = 'block';
+            });
+
+            input.addEventListener('input', () => {
+                renderList(input.value);
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!input.contains(e.target) && !list.contains(e.target)) {
+                    list.style.display = 'none';
+                }
+            });
+
+            function renderList(filter) {
+                list.innerHTML = '';
+                const filtered = options.filter(q =>
+                    q.toLowerCase().includes(filter.toLowerCase())
+                );
+                if (filtered.length > 0) {
+                    filtered.forEach(q => {
+                        const item = document.createElement('div');
+                        item.className = 'dropdown-item';
+                        item.textContent = q;
+                        item.onclick = () => {
+                            input.value = q;
+                            list.style.display = 'none';
+                        };
+                        list.appendChild(item);
+                    });
+                } else {
+                    const noRes = document.createElement('div');
+                    noRes.className = 'dropdown-item no-results';
+                    noRes.textContent = `${noResText} – saisie libre acceptée`;
+                    list.appendChild(noRes);
+                }
+            }
+        }
+
+        // --- Envoi du Formulaire ---
+        document.getElementById('reportForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const nom = document.getElementById('nomCitoyen').value.trim();
+            const telephone = document.getElementById('telephone').value.trim();
+            const coordsVal = document.getElementById('gpsCoords').value;
+            const quartier = document.getElementById('quartier').value.trim();
+            const type = document.getElementById('typeProblem').value.trim();
+            const photoFile = document.getElementById('photoInput').files[0];
+
+            if (!coordsVal || coordsVal === 'Recherche satellite...') {
+                return alert("Veuillez activer le GPS pour obtenir vos coordonnées.");
+            }
+
+            const [lat, lng] = coordsVal.split(', ').map(parseFloat);
+
+            // Build FormData (supports file upload)
+            const formData = new FormData();
+            formData.append('nom', nom);
+            formData.append('telephone', telephone);
+            formData.append('lat', lat);
+            formData.append('lng', lng);
+            formData.append('quartier', quartier);
+            formData.append('type', type);
+            if (photoFile) formData.append('photo', photoFile);
+
+            // Show loading state
+            const submitBtn = document.getElementById('submitBtn');
+            const submitStatus = document.getElementById('submitStatus');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Envoi en cours...';
+
+            try {
+                // Send to server
+                const res = await fetch(`${API_BASE}/reports`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Erreur serveur');
+                }
+
+                const saved = await res.json();
+
+                // Place marker on map with bubble icon + click-to-zoom
+                const marker = L.marker([lat, lng], {
+                    icon: L.divIcon({
+                        className: 'report-marker',
+                        html: '<div class="marker-bubble"><span class="marker-emoji">🗑️</span></div>',
+                        iconSize: [44, 44],
+                        iconAnchor: [22, 44],
+                        popupAnchor: [0, -44]
+                    })
+                }).addTo(map).bindPopup(`<b>Signal envoyé !</b><br>${type}`);
+                marker.on('dblclick', (e) => {
+                    L.DomEvent.stopPropagation(e);
+                    if (map.getZoom() < 17) map.flyTo([lat, lng], 17, { animate: true, duration: 1.0 });
+                });
+                
+                reportMarkers[saved.id] = marker;
+
+                // Success feedback
+                submitStatus.style.display = 'block';
+                submitStatus.className = 'submit-status success';
+                submitStatus.innerHTML = '<i class="fas fa-check-circle"></i> Signalement envoyé avec succès ! Merci.';
+
+                // Reset
+                this.reset();
+                removePhoto();
+                setTimeout(() => { submitStatus.style.display = 'none'; }, 5000);
+
+            } catch (err) {
+                submitStatus.style.display = 'block';
+                submitStatus.className = 'submit-status error';
+                submitStatus.innerHTML = `<i class="fas fa-exclamation-circle"></i> Erreur: ${err.message}`;
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Envoyer le signalement';
+            }
+        });
+    </script>
+</body>
+</html>

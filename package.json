@@ -1,0 +1,17 @@
+{
+  "name": "cud-gestion-ordures",
+  "version": "1.0.0",
+  "description": "Système de gestion des déchets - CUD Douala",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "@sqlite.org/sqlite-wasm": "latest",
+    "cors": "^2.8.5",
+    "express": "^4.18.3",
+    "multer": "^1.4.5-lts.1",
+    "sql.js": "^1.12.0"
+  }
+}

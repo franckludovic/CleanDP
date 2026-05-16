@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administration CUD - Douala</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="admin-layout">
+        <!-- Sidebar de gestion -->
+        <aside class="admin-sidebar">
+            <div class="admin-header">
+                <img src="logo_cud4.png" class="logo_cud4">
+                <h2><i class="fas fa-city"></i> CUD Admin</h2>
+                <small id="reportCount" style="color:#adf; font-size:0.8rem;"></small>
+            </div>
+            <div class="admin-content">
+
+                <!-- Section Signalements -->
+                <div class="admin-section">
+                    <h3><i class="fas fa-bell"></i> Signalements en attente</h3>
+                    <div id="reportsList">
+                        <p style="color:#777; font-size:0.8rem;">Chargement...</p>
+                    </div>
+                </div>
+
+                <!-- Section Hysacam -->
+                <div class="admin-section">
+                    <h3><i class="fas fa-truck"></i> Planning Hysacam</h3>
+                    <div class="form-group">
+                        <input type="text" id="schedQuartier" class="form-control" placeholder="Quartier" style="margin-bottom:5px;">
+                        <input type="time" id="schedTime" class="form-control" style="margin-bottom:5px;">
+                        <button onclick="addSchedule()" class="btn-add">Ajouter Passage</button>
+                    </div>
+                    <div id="scheduleList"></div>
+                </div>
+
+                <!-- Section Points Fixes -->
+                <div class="admin-section">
+                    <h3><i class="fas fa-map-marker-alt"></i> Points Fixes</h3>
+                    <div class="form-group">
+                        <input type="text" id="fixedName" class="form-control" placeholder="Nom du lieu" style="margin-bottom:5px;">
+                        <small style="color:red; display:block; margin-bottom:5px;">Cliquez sur la carte pour placer le point avant d'ajouter.</small>
+                        <button onclick="addFixedPoint()" class="btn-add" style="background:var(--accent)">Ajouter Point</button>
+                    </div>
+                </div>
+
+            </div>
+        </aside>
+
+        <!-- Carte Admin -->
+        <div id="map" style="flex:1;"></div>
+    </div>
+
+    <!-- Modal photo -->
+    <div id="photoModal" class="photo-modal" onclick="closePhotoModal()">
+        <div class="photo-modal-content" onclick="event.stopPropagation()">
+            <button class="photo-modal-close" onclick="closePhotoModal()"><i class="fas fa-times"></i></button>
+            <img id="photoModalImg" src="" alt="Photo du signalement">
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const API_BASE = 'http://localhost:3000/api';
+        const DOUALA_CENTER = [4.0483, 9.7043];
+        let map;
+        let markers = {};
+        let tempMarker = null;
+
+        window.onload = function() {
+            initMap();
+            loadData();
+            setInterval(pollReports, 8000); // Smart poll every 8s (no blink)
+        };
+
+        function initMap() {
+            map = L.map('map', {
+                doubleClickZoom: false // Disable map dblclick zoom to favor marker interaction
+            }).setView(DOUALA_CENTER, 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            map.on('click', (e) => {
+                if(tempMarker) map.removeLayer(tempMarker);
+                tempMarker = L.marker([e.latlng.lat, e.latlng.lng])
+                    .addTo(map)
+                    .bindPopup("Nouveau point fixe ?")
+                    .openPopup();
+            });
+        }
+
+        // Track which report IDs are already rendered
+        const knownReportIds = new Set();
+        let isFirstLoad = true;
+
+        async function loadData() {
+            await Promise.all([loadReports(), loadSchedules(), loadFixedPoints()]);
+            isFirstLoad = false;
+        }
+
+        // Called on interval — only updates reports, no map/schedule flicker
+        async function pollReports() {
+            await loadReports();
+        }
+
+        async function loadReports() {
+            const list = document.getElementById('reportsList');
+            try {
+                const res = await fetch(`${API_BASE}/reports`);
+                const reports = await res.json();
+
+                const pending = reports.filter(r => r.status === 'pending');
+                const pendingIds = new Set(pending.map(r => r.id));
+
+                // Update counter
+                document.getElementById('reportCount').textContent =
+                    `${pending.length} signalement(s) en attente`;
+
+                // --- Remove resolved reports from DOM + map (smooth fade-out) ---
+                knownReportIds.forEach(id => {
+                    if (!pendingIds.has(id)) {
+                        // Fade out then remove the card
+                        const card = document.getElementById(`report-card-${id}`);
+                        if (card) {
+                            card.style.transition = 'opacity 0.4s, transform 0.4s';
+                            card.style.opacity = '0';
+                            card.style.transform = 'translateX(-20px)';
+                            setTimeout(() => card.remove(), 420);
+                        }
+                        // Remove marker from map
+                        if (markers['rep_' + id]) {
+                            map.removeLayer(markers['rep_' + id]);
+                            delete markers['rep_' + id];
+                        }
+                        knownReportIds.delete(id);
+                    }
+                });
+
+                // --- Add only NEW reports ---
+                pending.forEach(r => {
+                    if (knownReportIds.has(r.id)) return; // Already rendered
+                    knownReportIds.add(r.id);
+
+                    const emoji = '🗑️';
+
+                    // Build card
+                    const div = document.createElement('div');
+                    div.className = 'report-item' + (isFirstLoad ? '' : ' report-item-new');
+                    div.id = `report-card-${r.id}`;
+                    div.innerHTML = `
+                        <div class="report-header">
+                            <span>${emoji} ${r.quartier}</span>
+                            <button onclick="resolveReport(${r.id})" class="btn-resolve">Résolu</button>
+                        </div>
+                        <div class="report-type">${r.type}</div>
+                        <div class="report-identity">
+                            <i class="fas fa-user"></i> ${r.nom} &nbsp;|&nbsp; <i class="fas fa-phone"></i> ${r.telephone}
+                        </div>
+                        ${r.photo ? `<div class="report-photo-thumb" onclick="openPhotoModal('${r.photo}')">
+                            <img src="/uploads/${r.photo}" alt="Photo">
+                            <span>Voir photo</span>
+                        </div>` : ''}
+                        <div class="report-actions">
+                            <button onclick="viewZone(${r.id})" class="btn-view-zone">
+                                <i class="fas fa-map-marker-alt"></i> Voir Zone
+                            </button>
+                        </div>
+                        <small>${r.date}</small>
+                    `;
+                    // Prepend so newest appear at top
+                    list.prepend(div);
+
+                    // Add map marker
+                    const popupContent = `
+                        <b>${emoji} ${r.quartier}</b><br>
+                        ${r.type}<br>
+                        <small><i class='fas fa-user'></i> ${r.nom} — ${r.telephone}</small><br>
+                        ${r.photo ? `<img src='/uploads/${r.photo}' style='width:100%;max-width:180px;border-radius:6px;margin-top:6px;cursor:pointer' onclick="openPhotoModal('${r.photo}')">` : ''}
+                        <br><button onclick="resolveReport(${r.id})" style="margin-top:8px;background:#28a745;color:#fff;border:none;padding:4px 10px;border-radius:4px;cursor:pointer">Résoudre</button>
+                    `;
+                    const m = L.marker([r.lat, r.lng], {
+                        icon: L.divIcon({
+                            className: 'report-marker',
+                            html: `<div class="marker-bubble"><span class="marker-emoji">${emoji}</span></div>`,
+                            iconSize: [44, 44],
+                            iconAnchor: [22, 44],
+                            popupAnchor: [0, -44]
+                        })
+                    }).addTo(map).bindPopup(popupContent);
+                    m.on('dblclick', (e) => {
+                        L.DomEvent.stop(e); // Stronger stop propagation
+                        if (map.getZoom() < 17) {
+                            map.flyTo([r.lat, r.lng], 17, { animate: true, duration: 1.0 });
+                        }
+                    });
+                    markers['rep_' + r.id] = m;
+                });
+
+                // Show "all clear" only if list is actually empty
+                const noMsg = list.querySelector('.no-reports-msg');
+                if (pending.length === 0 && knownReportIds.size === 0) {
+                    if (!noMsg) {
+                        const p = document.createElement('p');
+                        p.className = 'no-reports-msg';
+                        p.style.cssText = 'color:#4caf50;font-size:0.85rem;';
+                        p.innerHTML = '<i class="fas fa-check-circle"></i> Aucun signalement en attente.';
+                        list.appendChild(p);
+                    }
+                } else if (noMsg) {
+                    noMsg.remove();
+                }
+
+            } catch (err) {
+                // Don't destroy the list on a network hiccup — just log it
+                console.warn('Poll error (non-fatal):', err.message);
+            }
+        }
+
+        async function loadSchedules() {
+            const schedList = document.getElementById('scheduleList');
+            try {
+                const res = await fetch(`${API_BASE}/schedules`);
+                const schedules = await res.json();
+                schedList.innerHTML = '';
+                schedules.forEach(s => {
+                    const li = document.createElement('div');
+                    li.className = 'schedule-item';
+                    li.innerHTML = `<span>${s.quartier} - ${s.time}</span> <i class="fas fa-times" style="cursor:pointer" onclick="removeSchedule(${s.id})"></i>`;
+                    schedList.appendChild(li);
+
+                    const m = L.marker(DOUALA_CENTER, {
+                        icon: L.divIcon({
+                            className: 'hysacam-marker',
+                            html: '<div class="marker-bubble-small">🚛</div>',
+                            iconSize: [36, 36],
+                            iconAnchor: [18, 36]
+                        })
+                    }).addTo(map).bindPopup(`<b>Hysacam</b><br>${s.quartier} à ${s.time}`);
+
+                    m.on('dblclick', (e) => {
+                        L.DomEvent.stopPropagation(e);
+                        if (map.getZoom() < 16) map.flyTo(DOUALA_CENTER, 16, { animate: true, duration: 1.0 });
+                    });
+                });
+            } catch (err) {
+                console.error('Schedules error:', err.message);
+            }
+        }
+
+        async function loadFixedPoints() {
+            try {
+                const res = await fetch(`${API_BASE}/fixed-points`);
+                const points = await res.json();
+                points.forEach(f => {
+                    const m = L.marker([f.lat, f.lng], {
+                        icon: L.divIcon({
+                            className: 'fixed-marker',
+                            html: '<div class="marker-bubble-small">♻️</div>',
+                            iconSize: [36, 36],
+                            iconAnchor: [18, 36]
+                        })
+                    }).addTo(map).bindPopup(`<b>Point Fixe</b><br>${f.name}`);
+
+                    m.on('dblclick', (e) => {
+                        L.DomEvent.stopPropagation(e);
+                        if (map.getZoom() < 16) map.flyTo([f.lat, f.lng], 16, { animate: true, duration: 1.0 });
+                    });
+                });
+            } catch (err) {
+                console.error('Fixed points error:', err.message);
+            }
+        }
+
+        // --- Actions Admin ---
+
+        // Fly the map to a report's location and auto-open its popup
+        function viewZone(id) {
+            const m = markers['rep_' + id];
+            if (!m) return;
+            const latlng = m.getLatLng();
+            
+            // Only zoom/fly if not already at the target zoom or far away
+            if (map.getZoom() < 17 || map.getCenter().distanceTo(latlng) > 50) {
+                map.flyTo(latlng, 17, { animate: true, duration: 1.2 });
+                // Wait for flyTo to finish before opening popup
+                setTimeout(() => m.openPopup(), 1300);
+            } else {
+                // Already there? Just open the popup
+                m.openPopup();
+            }
+        }
+
+        async function resolveReport(id) {
+            if (!confirm("Marquer ce problème comme résolu ?")) return;
+            try {
+                await fetch(`${API_BASE}/reports/${id}/resolve`, { method: 'PUT' });
+                await loadReports();
+            } catch (err) {
+                alert('Erreur: ' + err.message);
+            }
+        }
+
+        async function addSchedule() {
+            const q = document.getElementById('schedQuartier').value.trim();
+            const t = document.getElementById('schedTime').value;
+            if (!q || !t) return alert("Remplissez les champs");
+
+            try {
+                await fetch(`${API_BASE}/schedules`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ quartier: q, time: t })
+                });
+                document.getElementById('schedQuartier').value = '';
+                document.getElementById('schedTime').value = '';
+                await loadSchedules();
+            } catch (err) {
+                alert('Erreur: ' + err.message);
+            }
+        }
+
+        async function removeSchedule(id) {
+            try {
+                await fetch(`${API_BASE}/schedules/${id}`, { method: 'DELETE' });
+                await loadSchedules();
+            } catch (err) {
+                alert('Erreur: ' + err.message);
+            }
+        }
+
+        async function addFixedPoint() {
+            const name = document.getElementById('fixedName').value.trim();
+            if (!name) return alert("Entrez un nom");
+            if (!tempMarker) return alert("Cliquez sur la carte pour positionner le point");
+
+            const latlng = tempMarker.getLatLng();
+            try {
+                await fetch(`${API_BASE}/fixed-points`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, lat: latlng.lat, lng: latlng.lng })
+                });
+                map.removeLayer(tempMarker);
+                tempMarker = null;
+                document.getElementById('fixedName').value = '';
+                await loadFixedPoints();
+            } catch (err) {
+                alert('Erreur: ' + err.message);
+            }
+        }
+
+        // --- Photo Modal ---
+        function openPhotoModal(filename) {
+            document.getElementById('photoModalImg').src = `/uploads/${filename}`;
+            document.getElementById('photoModal').style.display = 'flex';
+        }
+
+        function closePhotoModal() {
+            document.getElementById('photoModal').style.display = 'none';
+            document.getElementById('photoModalImg').src = '';
+        }
+    </script>
+</body>
+</html>
