@@ -381,7 +381,7 @@ body { font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-size:14px; 
 }
 /* Hover: expand to the LEFT (icon stays on right, label fills leftward) */
 .stats-pill:hover {
-    width: 180px;
+    width: 190px;
     flex-direction: row-reverse; /* icon right, label left */
     border-radius: 22px;
     padding: 0 12px;

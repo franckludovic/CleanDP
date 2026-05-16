@@ -8,8 +8,41 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* Modern Login Overlay */
+        .login-overlay { position: fixed; inset: 0; background: #f8fafc; z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .login-card { background: white; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
+        .login-logo { width: 80px; margin-bottom: 20px; }
+        .login-card h2 { margin-bottom: 10px; color: #1e293b; font-size: 1.5rem; }
+        .login-card p { color: #64748b; margin-bottom: 25px; font-size: 0.9rem; }
+        .login-error { color: #e11d48; font-size: 0.85rem; margin-top: 15px; display: none; }
+    </style>
 </head>
 <body>
+    <!-- Modern Login Overlay -->
+    <div id="login-overlay" class="login-overlay">
+        <div class="login-card">
+            <img src="https://seeklogo.com/images/C/communauté-urbaine-de-douala-logo-7E61B0121B-seeklogo.com.png" class="login-logo" alt="CUD">
+            <h2>Administration CUD</h2>
+            <p>Accès restreint. Veuillez entrer votre code administrateur.</p>
+            <div class="form-group" style="margin-bottom: 20px;">
+                <input type="password" id="login-pass-input" class="form-control" placeholder="Code d'accès..." style="text-align: center; font-size: 1.1rem; letter-spacing: 0.2em;">
+            </div>
+            <button id="login-submit-btn" class="btn-primary">Se connecter</button>
+            <div id="login-error-msg" class="login-error">Code incorrect. Veuillez réessayer.</div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // Check session on load
+            if (localStorage.getItem('admin_session') === 'authenticated') {
+                document.addEventListener('DOMContentLoaded', () => {
+                    document.getElementById('login-overlay').style.display = 'none';
+                });
+            }
+        })();
+    </script>
     <div class="admin-layout">
         <!-- Sidebar de gestion -->
         <aside class="admin-sidebar">
@@ -22,7 +55,12 @@
                         <span class="admin-brand">CUD Admin</span>
                         <span class="admin-subtitle">Centre de Contrôle</span>
                     </div>
-                    <div class="admin-status-dot" title="Système actif"></div>
+                    <div style="margin-left: auto; display: flex; gap: 8px; align-items: center;">
+                        <button onclick="openSettingsModal()" style="background:rgba(255,255,255,0.15); border:none; color:white; width:30px; height:30px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background 0.2s;">
+                            <i class="fas fa-cog" style="font-size:0.9rem;"></i>
+                        </button>
+                        <div class="admin-status-dot" title="Système actif"></div>
+                    </div>
                 </div>
                 <div class="admin-stats-bar">
                     <div class="stat-chip" id="reportCount">
@@ -105,9 +143,35 @@
                     <div class="section-intro">Tous les signalements reçus (en cours et résolus).</div>
                     <div id="historyList"><div class="loading-placeholder"><i class="fas fa-circle-notch fa-spin"></i> <span>Chargement…</span></div></div>
                 </div>
-
             </div>
         </aside>
+
+        <!-- Modern Settings Modal -->
+        <div id="settings-modal" class="photo-modal" style="display:none; z-index:10001;">
+            <div class="login-card" style="position:relative; max-width:380px;">
+                <button class="photo-modal-close" onclick="closeSettingsModal()" style="top:10px; right:10px;">&times;</button>
+                <i class="fas fa-cog" style="font-size:2rem; color:var(--primary); margin-bottom:15px;"></i>
+                <h2>Paramètres Sécurité</h2>
+                <p>Modifier votre code d'accès administrateur.</p>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <input type="password" id="old-pass" class="form-control" placeholder="Ancien code...">
+                </div>
+                <div class="form-group" style="margin-bottom:20px;">
+                    <input type="password" id="new-pass" class="form-control" placeholder="Nouveau code...">
+                </div>
+                <button onclick="updatePassword()" class="btn-primary">Mettre à jour le code</button>
+                <div id="settings-msg" style="margin-top:15px; font-size:0.85rem;"></div>
+                
+                <button onclick="closeSettingsModal()" class="btn-primary" style="margin-top:10px; background:var(--surface-2); color:var(--text-secondary); border:1px solid var(--border);">
+                    Annuler / Fermer
+                </button>
+
+                <hr style="margin:20px 0; border:none; border-top:1px solid var(--border);">
+                <button onclick="logout()" class="btn-primary" style="background:var(--text-muted);">
+                    <i class="fas fa-sign-out-alt"></i> Déconnexion
+                </button>
+            </div>
+        </div>
 
         <!-- Map -->
         <div class="map-wrapper">
@@ -164,7 +228,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="animation.js"></script>
     <script>
-        const API_BASE = 'http://localhost:3000/api';
+        const API_BASE = '/api';
         const DOUALA_CENTER = [4.0483, 9.7043];
         let map;
         let isFirstLoad = true;
@@ -349,7 +413,7 @@
                         card.innerHTML = `
                             <div class="report-header">
                                 <span>🚨 ${r.quartier}</span>
-                                <small>${(r.date || '').split(' ')[0]}</small>
+                                <span class="status-badge" style="background:var(--danger); font-size:0.65rem; padding:2px 6px;">En attente</span>
                             </div>
                             <div class="report-type">${r.type}</div>
                             <div class="report-identity">
@@ -921,7 +985,8 @@
 
         // --- Photo Modal ---
         function openPhotoModal(filename) {
-            document.getElementById('photoModalImg').src = `/uploads/${filename}`;
+            const src = filename.startsWith('http') ? filename : `/uploads/${filename}`;
+            document.getElementById('photoModalImg').src = src;
             document.getElementById('photoModal').style.display = 'flex';
         }
 
@@ -973,6 +1038,83 @@
                     list.appendChild(noRes);
                 }
             }
+        }
+
+        // --- Auth Logic ---
+        document.getElementById('login-submit-btn').addEventListener('click', async () => {
+            const password = document.getElementById('login-pass-input').value;
+            const errorMsg = document.getElementById('login-error-msg');
+            try {
+                const res = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    localStorage.setItem('admin_session', 'authenticated');
+                    document.getElementById('login-overlay').style.display = 'none';
+                    loadReports();
+                    loadFixedPoints();
+                    loadHistory();
+                } else {
+                    errorMsg.style.display = 'block';
+                    errorMsg.textContent = data.error || "Code incorrect.";
+                }
+            } catch (e) {
+                alert("Erreur de connexion au serveur.");
+            }
+        });
+
+        document.getElementById('login-pass-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') document.getElementById('login-submit-btn').click();
+        });
+
+        async function updatePassword() {
+            const oldPassword = document.getElementById('old-pass').value;
+            const newPassword = document.getElementById('new-pass').value;
+            const msg = document.getElementById('settings-msg');
+
+            if (!oldPassword || !newPassword) {
+                msg.style.color = 'var(--danger)';
+                msg.textContent = "Veuillez remplir tous les champs.";
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/auth/change-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ oldPassword, newPassword })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    msg.style.color = 'var(--success)';
+                    msg.textContent = "Mot de passe mis à jour !";
+                    document.getElementById('old-pass').value = '';
+                    document.getElementById('new-pass').value = '';
+                } else {
+                    msg.style.color = 'var(--danger)';
+                    msg.textContent = data.error || "Erreur.";
+                }
+            } catch (e) {
+                msg.style.color = 'var(--danger)';
+                msg.textContent = "Erreur serveur.";
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('admin_session');
+            window.location.reload();
+        }
+
+        function openSettingsModal() {
+            document.getElementById('settings-modal').style.display = 'flex';
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settings-modal').style.display = 'none';
+            document.getElementById('settings-msg').textContent = '';
         }
     </script>
 </body>
