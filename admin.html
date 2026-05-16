@@ -432,8 +432,9 @@
 
                         // Map marker
                         if (!markers['rep_' + r.id]) {
+                            const photoSrc = (r.photo && r.photo.startsWith('http')) ? r.photo : `/uploads/${r.photo}`;
                             const popupContent = `<b>🚨 ${r.quartier}</b><br>${r.type}<br><small>${r.nom} — ${r.telephone}</small>
-                                ${r.photo ? `<br><img src='/uploads/${r.photo}' style='width:100%;max-width:180px;border-radius:6px;margin-top:6px;cursor:pointer' onclick="openPhotoModal('${r.photo}')">` : ''}
+                                ${r.photo ? `<br><img src='${photoSrc}' style='width:100%;max-width:180px;border-radius:6px;margin-top:6px;cursor:pointer' onclick="openPhotoModal('${r.photo}')">` : ''}
                                 <div style="margin-top:8px;">
                                     <button onclick="resolveReport(${r.id})" style="background:#057a55;color:#fff;border:none;padding:4px 8px;border-radius:4px;cursor:pointer">Résoudre</button>
                                 </div>`;
